@@ -7,7 +7,7 @@ Tested with Keycloak version 19.x, if you are using different Keycloak version, 
 
 The [Server Development part of the Keycloak reference documentation](https://www.keycloak.org/docs/latest/server_development/index.html) contains additional resources and examples for developing custom Keycloak extensions.
 
-# Deployment
+# 🚀 Deployment
 
 ## Provider
 
