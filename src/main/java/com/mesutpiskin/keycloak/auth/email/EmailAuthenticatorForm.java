@@ -80,8 +80,14 @@ public class EmailAuthenticatorForm implements Authenticator {
             return;
         }
 
-        int givenEmailCode = Integer.parseInt(formData.getFirst(EMAIL_CODE));
-        boolean valid = validateCode(context, givenEmailCode);
+        boolean valid;
+        try {
+            int givenEmailCode = Integer.parseInt(formData.getFirst(EMAIL_CODE));
+            valid = validateCode(context, givenEmailCode);
+        } catch (NumberFormatException e) {
+            valid = false;
+        }
+
         if (!valid) {
             context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
             challenge(context, new FormMessage(Messages.INVALID_ACCESS_CODE));
