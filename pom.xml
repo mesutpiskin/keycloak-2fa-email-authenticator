@@ -15,7 +15,7 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <lombok.version>1.18.22</lombok.version>
-        <keycloak.version>20.0.2</keycloak.version>
+        <keycloak.version>21.0.2</keycloak.version>
         <auto-service.version>1.0.1</auto-service.version>
     </properties>
 
