@@ -10,10 +10,22 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
-
+  kc-version-matrix:
+    name: Get last 10 Keycloak versions
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          VERSIONS=$( curl -L -s https://api.github.com/repos/keycloak/keycloak/tags | jq -c 'sort_by(.name)[-11:-1] | [ .[] | .version=.name | {version}]' )
+          echo "::set-output name=matrix::{\"include\":$VERSIONS}"
 
+  build:
+    needs: kc-version-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{fromJson(needs.kc-version-matrix.outputs.matrix)}}
     steps:
     - uses: actions/checkout@v3
     - name: Set up JDK 11
