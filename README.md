@@ -3,11 +3,15 @@
 Keycloak Authentication Provider implementation to get a two factor authentication with an OTP/code/token send via Email (through SMTP)
 
 When logging in with this provider, you can send a verification code (otp) to the user's e-mail address.
-Tested with Keycloak version 19.x, if you are using different Keycloak version, don't forget to change the version in pom.xml file.
+Tested with Keycloak version 21.x, if you are using different Keycloak version, don't forget to change the version in pom.xml file.
 
 The [Server Development part of the Keycloak reference documentation](https://www.keycloak.org/docs/latest/server_development/index.html) contains additional resources and examples for developing custom Keycloak extensions.
 
 # 🚀 Deployment
+
+## Artifact
+
+You can download the necessary artifacts for Keycloak 2FA Email Authenticator from the [release on GitHub.](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/releases/tag/v0.4) Please choose the appropriate version based on your Keycloak installation.
 
 ## Provider
 
