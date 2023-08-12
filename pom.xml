@@ -83,5 +83,6 @@
                 </configuration>
             </plugin>
         </plugins>
+        <finalName>keycloak-2fa-email-authenticator</finalName>
     </build>
 </project>

@@ -53,6 +53,8 @@ public class EmailAuthenticatorForm implements Authenticator {
         context.challenge(response);
     }
 
+
+
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
 
         if (context.getAuthenticationSession().getAuthNote(EMAIL_CODE) != null) {

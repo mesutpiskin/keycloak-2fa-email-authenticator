@@ -26,7 +26,7 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
 
     @Override
     public boolean isConfigurable() {
-        return false;
+        return true;
     }
 
     public static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
@@ -43,6 +43,8 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
     public boolean isUserSetupAllowed() {
         return false;
     }
+
+
 
     @Override
     public String getHelpText() {
