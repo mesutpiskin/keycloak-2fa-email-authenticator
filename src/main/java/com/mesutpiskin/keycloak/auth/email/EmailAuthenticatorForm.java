@@ -14,6 +14,7 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.FormMessage;
 import org.keycloak.services.messages.Messages;
+import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
 
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @JBossLog
-public class EmailAuthenticatorForm implements Authenticator {
+public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator implements Authenticator {
 
     static final String ID = "demo-email-code-form";
 
@@ -40,17 +41,21 @@ public class EmailAuthenticatorForm implements Authenticator {
         challenge(context, null);
     }
 
-    private void challenge(AuthenticationFlowContext context, FormMessage errorMessage) {
-
+    @Override
+    protected Response challenge(AuthenticationFlowContext context, String error, String field) {
         generateAndSendEmailCode(context);
 
         LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
-        if (errorMessage != null) {
-            form.setErrors(List.of(errorMessage));
+        if (error != null) {
+            if (field != null) {
+                form.addError(new FormMessage(field, error));
+            } else {
+                form.setError(error);
+            }
         }
-
         Response response = form.createForm("email-code-form.ftl");
         context.challenge(response);
+        return response;
     }
 
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
@@ -67,6 +72,12 @@ public class EmailAuthenticatorForm implements Authenticator {
 
     @Override
     public void action(AuthenticationFlowContext context) {
+        UserModel userModel = context.getUser();
+        if (!enabledUser(context, userModel)) {
+            // error in context is set in enabledUser/isDisabledByBruteForce
+            return;
+        }
+
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
         if (formData.containsKey("resend")) {
             resetEmailCode(context);
@@ -89,13 +100,19 @@ public class EmailAuthenticatorForm implements Authenticator {
         }
 
         if (!valid) {
-            context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
-            challenge(context, new FormMessage(Messages.INVALID_ACCESS_CODE));
+            context.getEvent().user(userModel).error(Errors.INVALID_USER_CREDENTIALS);
+            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE);
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
             return;
         }
 
         resetEmailCode(context);
         context.success();
+    }
+
+    @Override
+    protected String disabledByBruteForceError() {
+        return Messages.INVALID_ACCESS_CODE;
     }
 
     private void resetEmailCode(AuthenticationFlowContext context) {
