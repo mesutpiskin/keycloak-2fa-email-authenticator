@@ -4,7 +4,6 @@ import lombok.extern.jbosslog.JBossLog;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
-import org.keycloak.authentication.Authenticator;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Errors;
@@ -24,9 +23,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @JBossLog
-public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator implements Authenticator {
-
-    static final String ID = "demo-email-code-form";
+public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     public static final String EMAIL_CODE = "emailCode";
 
