@@ -24,6 +24,12 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @JBossLog
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
+    /**
+     * TODO
+     * - Add time to live (ttl)
+     * - Improve HTML Tempalte (maybe use Keycloak OTP screen with extensions)
+     * - (optional) Improve Email Template
+     */
 
     public static final String EMAIL_CODE = "emailCode";
 
