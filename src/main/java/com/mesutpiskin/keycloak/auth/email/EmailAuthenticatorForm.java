@@ -30,7 +30,6 @@ import java.util.Map;
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
     /**
      * TODO
-     * - Add time to live (ttl)
      * - Improve HTML Tempalte (maybe use Keycloak OTP screen with extensions)
      * - (optional) Improve Email Template
      */
@@ -63,14 +62,13 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
     }
 
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
-        if (context.getAuthenticationSession().getAuthNote(EmailConstants.CODE) != null) {
-            // skip sending email code
-            return;
-        }
-
         AuthenticatorConfigModel config = context.getAuthenticatorConfig();
         AuthenticationSessionModel session = context.getAuthenticationSession();
 
+        if (session.getAuthNote(EmailConstants.CODE) != null) {
+            // skip sending email code
+            return;
+        }
 
         int length = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_LENGTH));
 		int ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
@@ -78,7 +76,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         sendEmailWithCode(context.getRealm(), context.getUser(), code);
         session.setAuthNote(EmailConstants.CODE, code);
         session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(System.currentTimeMillis() + (ttl * 1000L)));
-
     }
 
     @Override
