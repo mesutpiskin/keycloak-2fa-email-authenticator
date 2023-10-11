@@ -1,5 +1,5 @@
 <html>
 <body>
-${kcSanitize(msg("emailCodeBody", code))?no_esc}
+${kcSanitize(msg("emailCodeBody", code, ttl))?no_esc}
 </body>
 </html>

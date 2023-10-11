@@ -70,10 +70,16 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             return;
         }
 
-        int length = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_LENGTH));
-		int ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
+        int length = EmailConstants.DEFAULT_LENGTH;
+		int ttl = EmailConstants.DEFAULT_TTL;
+        if (config != null) {
+            // get config values
+            length = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_LENGTH));
+		    ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
+        }
+
         String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
-        sendEmailWithCode(context.getRealm(), context.getUser(), code);
+        sendEmailWithCode(context.getRealm(), context.getUser(), code, ttl);
         session.setAuthNote(EmailConstants.CODE, code);
         session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(System.currentTimeMillis() + (ttl * 1000L)));
     }
@@ -109,7 +115,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 			if (Long.parseLong(ttl) < System.currentTimeMillis()) {
 				// expired
                 context.getEvent().user(userModel).error(Errors.EXPIRED_CODE);
-                Response challengeResponse = challenge(context, Messages.EXPIRED_CODE);
+                Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS);
                 context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
 			} else {
 				// valid
@@ -158,7 +164,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         // NOOP
     }
 
-    private void sendEmailWithCode(RealmModel realm, UserModel user, String code) {
+    private void sendEmailWithCode(RealmModel realm, UserModel user, String code, int ttl) {
         if (user.getEmail() == null) {
             log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
@@ -167,6 +173,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         Map<String, Object> mailBodyAttributes = new HashMap<>();
         mailBodyAttributes.put("username", user.getUsername());
         mailBodyAttributes.put("code", code);
+        mailBodyAttributes.put("ttl", ttl);
 
         String realmName = realm.getDisplayName() != null ? realm.getDisplayName() : realm.getName();
         List<Object> subjectParams = List.of(realmName);
