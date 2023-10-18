@@ -56,11 +56,12 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
         return List.of(
-            new ProviderConfigProperty(EmailConstants.CODE_LENGTH, "Code length", "The number of digits of the generated code.",
-                ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_LENGTH)),
-            new ProviderConfigProperty(EmailConstants.CODE_TTL, "Time-to-live",
-                "The time to live in seconds for the code to be valid.", ProviderConfigProperty.STRING_TYPE,
-                String.valueOf(EmailConstants.DEFAULT_TTL)));
+                new ProviderConfigProperty(EmailConstants.CODE_LENGTH, "Code length",
+                        "The number of digits of the generated code.",
+                        ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_LENGTH)),
+                new ProviderConfigProperty(EmailConstants.CODE_TTL, "Time-to-live",
+                        "The time to live in seconds for the code to be valid.", ProviderConfigProperty.STRING_TYPE,
+                        String.valueOf(EmailConstants.DEFAULT_TTL)));
     }
 
     @Override

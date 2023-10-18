@@ -66,11 +66,11 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         }
 
         int length = EmailConstants.DEFAULT_LENGTH;
-		int ttl = EmailConstants.DEFAULT_TTL;
+        int ttl = EmailConstants.DEFAULT_TTL;
         if (config != null) {
             // get config values
             length = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_LENGTH));
-		    ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
+            ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
         }
 
         String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
@@ -102,32 +102,31 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
         AuthenticationSessionModel session = context.getAuthenticationSession();
         String code = session.getAuthNote(EmailConstants.CODE);
-		String ttl = session.getAuthNote(EmailConstants.CODE_TTL);
+        String ttl = session.getAuthNote(EmailConstants.CODE_TTL);
         String enteredCode = formData.getFirst(EmailConstants.CODE);
 
-
         if (enteredCode.equals(code)) {
-			if (Long.parseLong(ttl) < System.currentTimeMillis()) {
-				// expired
+            if (Long.parseLong(ttl) < System.currentTimeMillis()) {
+                // expired
                 context.getEvent().user(userModel).error(Errors.EXPIRED_CODE);
                 Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS);
                 context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
-			} else {
-				// valid
+            } else {
+                // valid
                 resetEmailCode(context);
-				context.success();
-			}
-		} else {
-			// invalid
-			AuthenticationExecutionModel execution = context.getExecution();
-			if (execution.isRequired()) {
+                context.success();
+            }
+        } else {
+            // invalid
+            AuthenticationExecutionModel execution = context.getExecution();
+            if (execution.isRequired()) {
                 context.getEvent().user(userModel).error(Errors.INVALID_USER_CREDENTIALS);
                 Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE);
                 context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-			} else if (execution.isConditional() || execution.isAlternative()) {
-				context.attempted();
-			}
-		}
+            } else if (execution.isConditional() || execution.isAlternative()) {
+                context.attempted();
+            }
+        }
     }
 
     @Override
@@ -161,7 +160,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     private void sendEmailWithCode(RealmModel realm, UserModel user, String code, int ttl) {
         if (user.getEmail() == null) {
-            log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
+            log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(),
+                    user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
         }
 
@@ -176,7 +176,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             EmailTemplateProvider emailProvider = session.getProvider(EmailTemplateProvider.class);
             emailProvider.setRealm(realm);
             emailProvider.setUser(user);
-            // Don't forget to add the welcome-email.ftl (html and text) template to your theme.
+            // Don't forget to add the welcome-email.ftl (html and text) template to your
+            // theme.
             emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
         } catch (EmailException eex) {
             log.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
