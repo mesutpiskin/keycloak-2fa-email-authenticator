@@ -28,11 +28,6 @@ import java.util.Map;
 
 @JBossLog
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
-    /**
-     * TODO
-     * - Improve HTML Tempalte (maybe use Keycloak OTP screen with extensions)
-     * - (optional) Improve Email Template
-     */
     private final KeycloakSession session;
 
     public EmailAuthenticatorForm(KeycloakSession session) {
