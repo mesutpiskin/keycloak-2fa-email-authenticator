@@ -160,8 +160,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     private void sendEmailWithCode(RealmModel realm, UserModel user, String code, int ttl) {
         if (user.getEmail() == null) {
-            log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(),
-                    user.getUsername());
+            log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
         }
 
@@ -176,8 +175,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             EmailTemplateProvider emailProvider = session.getProvider(EmailTemplateProvider.class);
             emailProvider.setRealm(realm);
             emailProvider.setUser(user);
-            // Don't forget to add the welcome-email.ftl (html and text) template to your
-            // theme.
+            // Don't forget to add the welcome-email.ftl (html and text) template to your theme.
             emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
         } catch (EmailException eex) {
             log.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
