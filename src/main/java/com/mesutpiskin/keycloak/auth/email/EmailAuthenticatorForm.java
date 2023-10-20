@@ -62,7 +62,7 @@ public class EmailAuthenticatorForm implements Authenticator {
             return;
         }
 
-        int emailCode = SecretGenerator.getInstance().randomString(8, SecretGenerator.DIGITS);
+        String emailCode = SecretGenerator.getInstance().randomString(8, SecretGenerator.DIGITS);
         sendEmailWithCode(context.getRealm(), context.getUser(), emailCode);
         context.getAuthenticationSession().setAuthNote(EMAIL_CODE, emailCode);
     }
