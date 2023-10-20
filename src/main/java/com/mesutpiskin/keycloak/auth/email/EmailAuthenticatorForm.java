@@ -63,8 +63,8 @@ public class EmailAuthenticatorForm implements Authenticator {
         }
 
         int emailCode = SecretGenerator.getInstance().randomString(8, SecretGenerator.DIGITS);
-        sendEmailWithCode(context.getRealm(), context.getUser(), String.valueOf(emailCode));
-        context.getAuthenticationSession().setAuthNote(EMAIL_CODE, Integer.toString(emailCode));
+        sendEmailWithCode(context.getRealm(), context.getUser(), emailCode);
+        context.getAuthenticationSession().setAuthNote(EMAIL_CODE, emailCode);
     }
 
     @Override
