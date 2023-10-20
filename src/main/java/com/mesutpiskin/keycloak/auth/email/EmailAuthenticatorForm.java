@@ -116,7 +116,11 @@ public class EmailAuthenticatorForm implements Authenticator {
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return true;
+        String enabled = user.getFirstAttribute("email-otp");
+        if (enabled == null) {
+            return false;
+        }
+        return Boolean.parseBoolean(enabled);
     }
 
     @Override
