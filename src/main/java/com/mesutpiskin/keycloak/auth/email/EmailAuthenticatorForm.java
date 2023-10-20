@@ -5,6 +5,7 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
 import org.keycloak.authentication.Authenticator;
+import org.keycloak.common.util.SecretGenerator;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Errors;
@@ -20,7 +21,6 @@ import javax.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 @JBossLog
 public class EmailAuthenticatorForm implements Authenticator {
@@ -28,6 +28,8 @@ public class EmailAuthenticatorForm implements Authenticator {
     static final String ID = "demo-email-code-form";
 
     public static final String EMAIL_CODE = "emailCode";
+
+    private static final SecretGenerator SECRET_GENERATOR = SecretGenerator.getInstance();
 
     private final KeycloakSession session;
 
@@ -60,7 +62,7 @@ public class EmailAuthenticatorForm implements Authenticator {
             return;
         }
 
-        int emailCode = ThreadLocalRandom.current().nextInt(99999999);
+        int emailCode = SecretGenerator.getInstance().randomString(8, SecretGenerator.DIGITS);
         sendEmailWithCode(context.getRealm(), context.getUser(), String.valueOf(emailCode));
         context.getAuthenticationSession().setAuthNote(EMAIL_CODE, Integer.toString(emailCode));
     }
