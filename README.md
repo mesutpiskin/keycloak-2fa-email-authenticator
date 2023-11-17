@@ -51,6 +51,6 @@ Don't forget to configure your realm's SMTP settings, otherwise no email will be
 4. Click on the `Email`-tab and enter your smpt data.
 
 ## Authentication Flow
-Create new browser login authentication flow and add Email OTP flow before Username Password Form.
+Create new browser login authentication flow and add Email OTP flow after Username Password Form.
 
 <img src="static/otp-form.png">
