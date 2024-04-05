@@ -9,7 +9,7 @@
         <form action="${url.loginAction}" class="${properties.kcFormClass!}" id="kc-u2f-login-form" method="post">
             <div class="${properties.kcFormGroupClass!}">
                 <label for="emailCode">Access Code</label>
-                <input id="emailCode" name="emailCode" type="text" inputmode="numeric" pattern="[0-9]*"/>
+                <input id="emailCode" name="emailCode" type="text" inputmode="numeric" pattern="[0-9]*" autofocus/>
             </div>
 
             <input class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonLargeClass!}"

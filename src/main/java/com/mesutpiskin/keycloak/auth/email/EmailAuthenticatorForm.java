@@ -5,6 +5,7 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
 import org.keycloak.authentication.Authenticator;
+import org.keycloak.common.util.SecretGenerator;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Errors;
@@ -21,7 +22,6 @@ import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 @JBossLog
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator implements Authenticator {
@@ -29,6 +29,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator im
     static final String ID = "demo-email-code-form";
 
     public static final String EMAIL_CODE = "emailCode";
+
+    private static final SecretGenerator SECRET_GENERATOR = SecretGenerator.getInstance();
 
     private final KeycloakSession session;
 
@@ -65,9 +67,9 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator im
             return;
         }
 
-        int emailCode = ThreadLocalRandom.current().nextInt(99999999);
-        sendEmailWithCode(context.getRealm(), context.getUser(), String.valueOf(emailCode));
-        context.getAuthenticationSession().setAuthNote(EMAIL_CODE, Integer.toString(emailCode));
+        String emailCode = SecretGenerator.getInstance().randomString(8, SecretGenerator.DIGITS);
+        sendEmailWithCode(context.getRealm(), context.getUser(), emailCode);
+        context.getAuthenticationSession().setAuthNote(EMAIL_CODE, emailCode);
     }
 
     @Override
@@ -131,7 +133,11 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator im
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return true;
+        String enabled = user.getFirstAttribute("email-otp");
+        if (enabled == null) {
+            return false;
+        }
+        return Boolean.parseBoolean(enabled);
     }
 
     @Override
