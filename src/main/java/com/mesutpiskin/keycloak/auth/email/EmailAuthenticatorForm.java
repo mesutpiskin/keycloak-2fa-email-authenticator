@@ -145,7 +145,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return true;
+        return user.getEmail() != null;
     }
 
     @Override
