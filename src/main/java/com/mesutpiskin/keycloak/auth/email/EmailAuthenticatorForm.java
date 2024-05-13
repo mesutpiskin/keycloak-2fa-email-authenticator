@@ -109,7 +109,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             if (Long.parseLong(ttl) < System.currentTimeMillis()) {
                 // expired
                 context.getEvent().user(userModel).error(Errors.EXPIRED_CODE);
-                Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS);
+                Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS, EmailConstants.CODE);
                 context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
             } else {
                 // valid
@@ -121,7 +121,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             AuthenticationExecutionModel execution = context.getExecution();
             if (execution.isRequired()) {
                 context.getEvent().user(userModel).error(Errors.INVALID_USER_CREDENTIALS);
-                Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE);
+                Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
                 context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
             } else if (execution.isConditional() || execution.isAlternative()) {
                 context.attempted();
