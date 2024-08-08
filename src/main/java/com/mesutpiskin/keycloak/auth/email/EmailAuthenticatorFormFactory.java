@@ -1,6 +1,5 @@
 package com.mesutpiskin.keycloak.auth.email;
 
-import com.google.auto.service.AutoService;
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.AuthenticatorFactory;
@@ -11,7 +10,6 @@ import org.keycloak.provider.ProviderConfigProperty;
 
 import java.util.List;
 
-@AutoService(AuthenticatorFactory.class)
 public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
     @Override
     public String getId() {
