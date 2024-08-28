@@ -54,3 +54,9 @@ Don't forget to configure your realm's SMTP settings, otherwise no email will be
 Create new browser login authentication flow and add Email OTP flow after Username Password Form.
 
 <img src="static/otp-form.png">
+
+## Keycloakify
+
+[Keycloakify v10 example](https://github.com/ckbaker10/keycloakify-starter/tree/email2fa-styling)
+
+[README](https://github.com/ckbaker10/keycloakify-starter/blob/email2fa-styling/README-EMAIL2FA.md)
