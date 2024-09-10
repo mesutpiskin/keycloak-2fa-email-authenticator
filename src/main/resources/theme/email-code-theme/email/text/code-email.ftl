@@ -1,2 +1,2 @@
 <#ftl output_format="plainText">
-${msg("emailCodeBody", code)}
+${msg("emailCodeBody", code, ttl)}

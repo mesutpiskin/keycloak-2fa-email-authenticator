@@ -13,6 +13,10 @@ import java.util.List;
 
 @AutoService(AuthenticatorFactory.class)
 public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
+    @Override
+    public String getId() {
+        return "email-authenticator";
+    }
 
     @Override
     public String getDisplayType() {
@@ -21,12 +25,12 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
 
     @Override
     public String getReferenceCategory() {
-        return null;
+        return "otp";
     }
 
     @Override
     public boolean isConfigurable() {
-        return false;
+        return true;
     }
 
     public static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
@@ -51,7 +55,13 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
 
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        return null;
+        return List.of(
+                new ProviderConfigProperty(EmailConstants.CODE_LENGTH, "Code length",
+                        "The number of digits of the generated code.",
+                        ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_LENGTH)),
+                new ProviderConfigProperty(EmailConstants.CODE_TTL, "Time-to-live",
+                        "The time to live in seconds for the code to be valid.", ProviderConfigProperty.STRING_TYPE,
+                        String.valueOf(EmailConstants.DEFAULT_TTL)));
     }
 
     @Override
@@ -72,10 +82,5 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
     @Override
     public void postInit(KeycloakSessionFactory factory) {
         // NOOP
-    }
-
-    @Override
-    public String getId() {
-        return EmailAuthenticatorForm.ID;
     }
 }
