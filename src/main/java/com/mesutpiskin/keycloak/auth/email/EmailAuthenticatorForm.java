@@ -28,11 +28,6 @@ import java.util.Map;
 
 @JBossLog
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
-    private final KeycloakSession session;
-
-    public EmailAuthenticatorForm(KeycloakSession session) {
-        this.session = session;
-    }
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
@@ -74,7 +69,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         }
 
         String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
-        sendEmailWithCode(context.getRealm(), context.getUser(), code, ttl);
+        sendEmailWithCode(context.getSession(), context.getRealm(), context.getUser(), code, ttl);
         session.setAuthNote(EmailConstants.CODE, code);
         session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(System.currentTimeMillis() + (ttl * 1000L)));
     }
@@ -158,7 +153,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         // NOOP
     }
 
-    private void sendEmailWithCode(RealmModel realm, UserModel user, String code, int ttl) {
+    private void sendEmailWithCode(KeycloakSession session, RealmModel realm, UserModel user, String code, int ttl) {
         if (user.getEmail() == null) {
             log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
