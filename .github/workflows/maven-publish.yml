@@ -6,6 +6,7 @@ name: Maven Package
 on:
   release:
     types: [released]
+  workflow_dispatch:
 
 jobs:
   kc-version-matrix:
