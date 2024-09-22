@@ -8,7 +8,7 @@
 
             <div class="${properties.kcFormGroupClass!}">
                 <div class="${properties.kcLabelWrapperClass!}">
-                    <label for="emailCode" class="${properties.kcLabelClass!}">${msg("loginOtpOneTime")}</label>
+                    <label for="emailCode" class="${properties.kcLabelClass!}">${msg("emailOtpForm")}</label>
                 </div>
 
             <div class="${properties.kcInputWrapperClass!}">
