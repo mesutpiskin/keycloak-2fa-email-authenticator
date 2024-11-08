@@ -26,14 +26,6 @@ copy `keycloak-2fa-email-authenticator.jar` to `keycloak/providers/` directory.
 
 If you are Dockerized keycloak then copy to `/opt/jboss/keycloak/standalone/deployments/` directory.
 
-## Theme Resources
-
-- **html/code-email.ftl** is a html email template. Copy to `themes/base/email/html/`
-
-- copy **text/code-email.ftl**  to `themes/base/email/text/`
-
-- append **messages/*.properties** to `themes/base/email/messages/messages_en.properties`
-
 ## Build
 
 Don't forget to start kc.sh with build parameter to make KeyCloak recognize the new povider:
