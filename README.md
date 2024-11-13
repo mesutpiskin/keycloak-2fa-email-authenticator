@@ -3,7 +3,7 @@
 Keycloak Authentication Provider implementation to get a two factor authentication with an OTP (One-time-password) send via Email (through SMTP).
 
 When logging in with this provider, you can send a verification code (OTP) to the user's e-mail address.
-Tested with Keycloak version 22.0.1. If you are using a different Keycloak version, don't forget to change the version in pom.xml file.
+Tested with Keycloak version 25.x. If you are using a different Keycloak version, don't forget to change the version in pom.xml file.
 
 The [Server Development part of the Keycloak reference documentation](https://www.keycloak.org/docs/latest/server_development/index.html) contains additional resources and examples for developing custom Keycloak extensions.
 
@@ -26,14 +26,6 @@ copy `keycloak-2fa-email-authenticator.jar` to `keycloak/providers/` directory.
 
 If you are Dockerized keycloak then copy to `/opt/jboss/keycloak/standalone/deployments/` directory.
 
-## Theme Resources
-
-- **html/code-email.ftl** is a html email template. Copy to `themes/base/email/html/`
-
-- copy **text/code-email.ftl**  to `themes/base/email/text/`
-
-- append **messages/*.properties** to `themes/base/email/messages/messages_en.properties`
-
 ## Build
 
 Don't forget to start kc.sh with build parameter to make KeyCloak recognize the new povider:
@@ -51,6 +43,6 @@ Don't forget to configure your realm's SMTP settings, otherwise no email will be
 4. Click on the `Email`-tab and enter your smpt data.
 
 ## Authentication Flow
-Create new browser login authentication flow and add Email OTP flow before Username Password Form.
+Create new browser login authentication flow and add Email OTP flow after Username Password Form.
 
 <img src="static/otp-form.png">

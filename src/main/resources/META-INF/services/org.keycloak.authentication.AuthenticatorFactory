@@ -1,1 +1,2 @@
 com.mesutpiskin.keycloak.auth.email.EmailAuthenticatorFormFactory
+com.mesutpiskin.keycloak.auth.email.ConditionalEmailAuthenticatorFormFactory
