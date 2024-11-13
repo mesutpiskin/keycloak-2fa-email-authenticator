@@ -140,7 +140,11 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return user.getEmail() != null;
+        String enabled = user.getFirstAttribute("email-otp");
+        if (enabled == null) {
+            return false;
+        }
+        return Boolean.parseBoolean(enabled);
     }
 
     @Override
