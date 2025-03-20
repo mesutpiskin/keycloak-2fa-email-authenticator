@@ -11,11 +11,11 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <lombok.version>1.18.34</lombok.version>
-        <keycloak.version>25.0.2</keycloak.version>
+        <keycloak.version>25.0.6</keycloak.version>
         <maven-jar.plugin.version>3.4.2</maven-jar.plugin.version>
     </properties>
 
