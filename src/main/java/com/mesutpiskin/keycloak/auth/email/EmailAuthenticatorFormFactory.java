@@ -46,6 +46,8 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
         return false;
     }
 
+
+
     @Override
     public String getHelpText() {
         return "Email otp authenticator.";

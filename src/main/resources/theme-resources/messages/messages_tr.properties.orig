@@ -1,3 +1,4 @@
+<<<<<<< HEAD:src/main/resources/theme/email-code-theme/email/messages/messages_tr.properties
 emailVerificationSubject=E-postay\u0131 do\u011Frula
 emailVerificationBody=Birisi bu e-posta adresiyle bir {2} hesap olu\u015Fturdu. Bu sizseniz, e-posta adresinizi do\u011Frulamak i\u00E7in a\u015Fa\u011F\u0131daki ba\u011Flant\u0131ya t\u0131klay\u0131n\n\n{0}\n\nBu ba\u011Flant\u0131 {3} i\u00E7inde sona erecek.\n\nBu hesab\u0131 olu\u015Fturmad\u0131ysan\u0131z, sadece bu iletiyi yoksay\u0131n\u0131z.
 emailVerificationBodyHtml=<p>Birisi bu e-posta adresiyle bir {2} hesap olu\u015Fturdu. Bu sizseniz, e-posta adresinizi do\u011Frulamak i\u00E7in a\u015Fa\u011F\u0131daki ba\u011Flant\u0131y\u0131 t\u0131klay\u0131n.</p><p><a href="{0}">E-posta adresi do\u011Frulama adresi</a></p><p>Bu ba\u011Flant\u0131n\u0131n s\u00FCresi {3} i\u00E7erisinde sona erecek.</p><p>Bu hesab\u0131 siz olu\u015Fturmad\u0131ysan\u0131z, bu mesaj\u0131 g\u00F6z ard\u0131 edin.</p>
@@ -48,3 +49,9 @@ linkExpirationFormatter.timePeriodUnit.days.1=g\u00FCn
 
 emailVerificationBodyCode=L\u00FCtfen a\u015Fa\u011F\u0131daki kodu girerek e-posta adresinizi do\u011Frulay\u0131n.\n\n{0}\n\n.
 emailVerificationBodyCodeHtml=<p>L\u00FCtfen a\u015Fa\u011F\u0131daki kodu girerek e-posta adresinizi do\u011Frulay\u0131n.</p><p><b>{0}</b></p>
+=======
+resendCode=Tekrar Gönder
+
+emailCodeSubject={0} dogrulama kodu
+emailCodeBody=Dogrulama kodunuz: {0}
+>>>>>>> f0356a6fc685c0fd412cf33da10d7b52e39ef00a:src/main/resources/theme-resources/messages/messages_tr.properties
