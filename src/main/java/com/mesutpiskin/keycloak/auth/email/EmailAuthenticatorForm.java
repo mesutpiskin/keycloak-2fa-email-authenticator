@@ -1,7 +1,5 @@
 package com.mesutpiskin.keycloak.auth.email;
 
-import lombok.extern.jbosslog.JBossLog;
-
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
@@ -20,14 +18,16 @@ import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
 import org.keycloak.common.util.SecretGenerator;
 
+import org.jboss.logging.Logger;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@JBossLog
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
+
+      protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
@@ -154,7 +154,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     private void sendEmailWithCode(KeycloakSession session, RealmModel realm, UserModel user, String code, int ttl) {
         if (user.getEmail() == null) {
-            log.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
+            logger.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
         }
 
@@ -172,7 +172,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             // Don't forget to add the welcome-email.ftl (html and text) template to your theme.
             emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
         } catch (EmailException eex) {
-            log.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
+            logger.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
         }
     }
 }
