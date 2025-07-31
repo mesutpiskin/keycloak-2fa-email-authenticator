@@ -108,7 +108,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
                 context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
             } else {
                 // valid
-                resetEmailCode(context);
+                resetEmailCode(context);                
+                userModel.setEmailVerified(true);
                 context.success();
             }
         } else {
