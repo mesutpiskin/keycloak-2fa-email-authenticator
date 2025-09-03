@@ -19,14 +19,14 @@ Find further information at https://projectlombok.org/setup/eclipse
 
 You can download the necessary artifacts for Keycloak 2FA Email Authenticator from the [release on GitHub.](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/releases/tag/v0.4) Please choose the appropriate version based on your Keycloak installation.
 
-## Providers
+## Build package
 
 `mvn package` will create a jar file.
 copy `keycloak-2fa-email-authenticator.jar` to `keycloak/providers/` directory.
 
 If you are Dockerized keycloak then copy to `/opt/jboss/keycloak/standalone/deployments/` directory.
 
-## Build
+## Build Keycloak
 
 Don't forget to start kc.sh with build parameter to make KeyCloak recognize the new povider:
 

