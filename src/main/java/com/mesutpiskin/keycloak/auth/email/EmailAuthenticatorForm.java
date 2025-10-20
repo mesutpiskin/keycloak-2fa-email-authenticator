@@ -51,6 +51,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         return response;
     }
 
+
+
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
         AuthenticatorConfigModel config = context.getAuthenticatorConfig();
         AuthenticationSessionModel session = context.getAuthenticationSession();
