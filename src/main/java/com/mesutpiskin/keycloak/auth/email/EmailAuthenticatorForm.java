@@ -100,7 +100,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         AuthenticationSessionModel session = context.getAuthenticationSession();
         String code = session.getAuthNote(EmailConstants.CODE);
         String ttl = session.getAuthNote(EmailConstants.CODE_TTL);
-        String enteredCode = formData.getFirst(EmailConstants.CODE);
+        String enteredCode = formData.getFirst(EmailConstants.CODE).strip();
 
         if (enteredCode.equals(code)) {
             if (Long.parseLong(ttl) < System.currentTimeMillis()) {
