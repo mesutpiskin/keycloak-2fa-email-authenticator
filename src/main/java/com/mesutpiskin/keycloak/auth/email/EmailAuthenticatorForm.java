@@ -31,13 +31,12 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
+        ensureEmailCode(context, false);
         challenge(context, null);
     }
 
     @Override
     protected Response challenge(AuthenticationFlowContext context, String error, String field) {
-        generateAndSendEmailCode(context);
-
         LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
         if (error != null) {
             if (field != null) {
@@ -56,11 +55,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
         AuthenticatorConfigModel config = context.getAuthenticatorConfig();
         AuthenticationSessionModel session = context.getAuthenticationSession();
-
-        if (session.getAuthNote(EmailConstants.CODE) != null) {
-            // skip sending email code
-            return;
-        }
 
         int length = EmailConstants.DEFAULT_LENGTH;
         int ttl = EmailConstants.DEFAULT_TTL;
@@ -86,7 +80,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
         if (formData.containsKey("resend")) {
-            resetEmailCode(context);
+            ensureEmailCode(context, true);
             challenge(context, null);
             return;
         }
@@ -126,12 +120,36 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         }
     }
 
+    private void ensureEmailCode(AuthenticationFlowContext context, boolean force) {
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        if (!force) {
+            String existingCode = session.getAuthNote(EmailConstants.CODE);
+            String existingTtl = session.getAuthNote(EmailConstants.CODE_TTL);
+            if (existingCode != null && existingTtl != null) {
+                long expiration;
+                try {
+                    expiration = Long.parseLong(existingTtl);
+                } catch (NumberFormatException nfe) {
+                    expiration = 0L;
+                }
+                if (expiration > System.currentTimeMillis()) {
+                    // Existing code is still valid; don't send another email.
+                    return;
+                }
+            }
+        }
+        resetEmailCode(context);
+        generateAndSendEmailCode(context);
+    }
+
     protected String disabledByBruteForceError() {
         return Messages.INVALID_ACCESS_CODE;
     }
 
     private void resetEmailCode(AuthenticationFlowContext context) {
-        context.getAuthenticationSession().removeAuthNote(EmailConstants.CODE);
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        session.removeAuthNote(EmailConstants.CODE);
+        session.removeAuthNote(EmailConstants.CODE_TTL);
     }
 
     @Override
