@@ -1,9 +1,12 @@
 package com.mesutpiskin.keycloak.auth.email;
 
 public class EmailConstants {
-	public static String CODE = "emailCode";
-	public static String CODE_LENGTH = "length";
-	public static String CODE_TTL = "ttl";
-	public static int DEFAULT_LENGTH = 6;
-	public static int DEFAULT_TTL = 300;
+	public static final String CODE = "emailCode";
+	public static final String CODE_LENGTH = "length";
+	public static final String CODE_TTL = "ttl";
+	public static final int DEFAULT_LENGTH = 6;
+	public static final int DEFAULT_TTL = 300;
+	public static final String RESEND_COOLDOWN = "resendCooldown";
+	public static final String CODE_RESEND_AVAILABLE_AFTER = "emailCodeResendAvailableAfter";
+	public static final int DEFAULT_RESEND_COOLDOWN = 30;
 }

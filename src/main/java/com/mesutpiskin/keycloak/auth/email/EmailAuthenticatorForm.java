@@ -3,6 +3,9 @@ package com.mesutpiskin.keycloak.auth.email;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
+import org.keycloak.authentication.CredentialValidator;
+import org.keycloak.authentication.RequiredActionFactory;
+import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Errors;
@@ -17,17 +20,20 @@ import org.keycloak.services.messages.Messages;
 import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
 import org.keycloak.common.util.SecretGenerator;
+import org.keycloak.credential.CredentialProvider;
 
 import org.jboss.logging.Logger;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
+public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
+        implements CredentialValidator<EmailAuthenticatorCredentialProvider> {
 
-      protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
+    protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
@@ -51,8 +57,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         return response;
     }
 
-
-
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
         AuthenticatorConfigModel config = context.getAuthenticatorConfig();
         AuthenticationSessionModel session = context.getAuthenticationSession();
@@ -62,18 +66,21 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             return;
         }
 
-        int length = EmailConstants.DEFAULT_LENGTH;
-        int ttl = EmailConstants.DEFAULT_TTL;
-        if (config != null) {
-            // get config values
-            length = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_LENGTH));
-            ttl = Integer.parseInt(config.getConfig().get(EmailConstants.CODE_TTL));
-        }
+        Map<String, String> configValues = config != null && config.getConfig() != null
+                ? config.getConfig()
+                : Map.of();
+
+        int length = resolvePositiveInt(configValues, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
+        int ttl = resolvePositiveInt(configValues, EmailConstants.CODE_TTL, EmailConstants.DEFAULT_TTL);
+        int resendCooldown = resolvePositiveInt(configValues, EmailConstants.RESEND_COOLDOWN,
+                EmailConstants.DEFAULT_RESEND_COOLDOWN);
 
         String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
         sendEmailWithCode(context.getSession(), context.getRealm(), context.getUser(), code, ttl);
         session.setAuthNote(EmailConstants.CODE, code);
-        session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(System.currentTimeMillis() + (ttl * 1000L)));
+        long now = System.currentTimeMillis();
+        session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(now + (ttl * 1000L)));
+        session.setAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER, Long.toString(now + (resendCooldown * 1000L)));
     }
 
     @Override
@@ -85,44 +92,121 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
         }
 
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
+        if (handleFormShortcuts(context, formData)) {
+            return;
+        }
+
+        CodeContext codeContext = buildCodeContext(context.getAuthenticationSession(), formData);
+        if (!validateCodeContext(context, userModel, codeContext)) {
+            return;
+        }
+
+        if (codeContext.expiresAt() < System.currentTimeMillis()) {
+            handleExpiredCode(context, userModel);
+            return;
+        }
+
+        if (codeContext.submittedCode().equals(codeContext.storedCode())) {
+            handleSuccessfulValidation(context);
+        } else {
+            handleInvalidCode(context, userModel);
+        }
+    }
+
+    private boolean handleFormShortcuts(AuthenticationFlowContext context, MultivaluedMap<String, String> formData) {
         if (formData.containsKey("resend")) {
+            AuthenticationSessionModel session = context.getAuthenticationSession();
+            String resendAvailableRaw = session.getAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
+            Long resendAvailableAt = null;
+            if (resendAvailableRaw != null) {
+                try {
+                    resendAvailableAt = Long.parseLong(resendAvailableRaw);
+                } catch (NumberFormatException ex) {
+                    logger.warnf("Invalid resend availability timestamp '%s' for email authenticator; allowing resend",
+                            resendAvailableRaw);
+                }
+            }
+
+            long now = System.currentTimeMillis();
+            if (resendAvailableAt != null && now < resendAvailableAt) {
+                long millisRemaining = resendAvailableAt - now;
+                long secondsRemaining = Math.max(1L, (millisRemaining + 999L) / 1000L);
+                LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
+                form.setError("email-authenticator-resend-cooldown", secondsRemaining);
+                Response response = form.createForm("email-code-form.ftl");
+                context.challenge(response);
+                return true;
+            }
+
             resetEmailCode(context);
             challenge(context, null);
-            return;
+            return true;
         }
 
         if (formData.containsKey("cancel")) {
             resetEmailCode(context);
             context.resetFlow();
-            return;
+            return true;
         }
 
-        AuthenticationSessionModel session = context.getAuthenticationSession();
-        String code = session.getAuthNote(EmailConstants.CODE);
-        String ttl = session.getAuthNote(EmailConstants.CODE_TTL);
-        String enteredCode = formData.getFirst(EmailConstants.CODE).strip();
+        return false;
+    }
 
-        if (enteredCode.equals(code)) {
-            if (Long.parseLong(ttl) < System.currentTimeMillis()) {
-                // expired
-                context.getEvent().user(userModel).error(Errors.EXPIRED_CODE);
-                Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS, EmailConstants.CODE);
-                context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
-            } else {
-                // valid
-                resetEmailCode(context);
-                context.success();
+    private CodeContext buildCodeContext(AuthenticationSessionModel session, MultivaluedMap<String, String> formData) {
+        String storedCode = session.getAuthNote(EmailConstants.CODE);
+        String ttlNote = session.getAuthNote(EmailConstants.CODE_TTL);
+        Long expiresAt = null;
+        if (ttlNote != null) {
+            try {
+                expiresAt = Long.parseLong(ttlNote);
+            } catch (NumberFormatException ex) {
+                logger.warnf("Invalid TTL value '%s' found for email authenticator; treating as expired", ttlNote);
             }
-        } else {
-            // invalid
-            AuthenticationExecutionModel execution = context.getExecution();
-            if (execution.isRequired()) {
-                context.getEvent().user(userModel).error(Errors.INVALID_USER_CREDENTIALS);
-                Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            } else if (execution.isConditional() || execution.isAlternative()) {
-                context.attempted();
-            }
+        }
+
+        String submittedRaw = formData.getFirst(EmailConstants.CODE);
+        String submittedCode = submittedRaw == null ? null : submittedRaw.strip();
+
+        return new CodeContext(storedCode, expiresAt, submittedCode);
+    }
+
+    private boolean validateCodeContext(AuthenticationFlowContext context, UserModel user, CodeContext codeContext) {
+        if (codeContext.storedCode() == null || codeContext.expiresAt() == null) {
+            context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
+            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
+            return false;
+        }
+
+        if (codeContext.submittedCode() == null || codeContext.submittedCode().isEmpty()) {
+            Response challengeResponse = challenge(context, Messages.MISSING_TOTP, EmailConstants.CODE);
+            context.challenge(challengeResponse);
+            return false;
+        }
+
+        return true;
+    }
+
+    private void handleExpiredCode(AuthenticationFlowContext context, UserModel user) {
+        context.getEvent().user(user).error(Errors.EXPIRED_CODE);
+        Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS,
+                EmailConstants.CODE);
+        context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
+    }
+
+    private void handleSuccessfulValidation(AuthenticationFlowContext context) {
+        resetEmailCode(context);
+        context.success();
+    }
+
+    private void handleInvalidCode(AuthenticationFlowContext context, UserModel user) {
+        AuthenticationExecutionModel execution = context.getExecution();
+        if (execution.isRequired()) {
+            context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
+            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
+        } else if (execution.isConditional() || execution.isAlternative()) {
+            context.attempted();
         }
     }
 
@@ -131,7 +215,13 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
     }
 
     private void resetEmailCode(AuthenticationFlowContext context) {
-        context.getAuthenticationSession().removeAuthNote(EmailConstants.CODE);
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        session.removeAuthNote(EmailConstants.CODE);
+        session.removeAuthNote(EmailConstants.CODE_TTL);
+        session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
+    }
+
+    private record CodeContext(String storedCode, Long expiresAt, String submittedCode) {
     }
 
     @Override
@@ -141,12 +231,24 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return user.getEmail() != null;
+        return getCredentialProvider(session).isConfiguredFor(realm, user, getType(session));
     }
 
     @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-        // NOOP
+        user.addRequiredAction(EmailAuthenticatorRequiredAction.PROVIDER_ID);
+    }
+
+    @Override
+    public EmailAuthenticatorCredentialProvider getCredentialProvider(KeycloakSession session) {
+        return (EmailAuthenticatorCredentialProvider) session.getProvider(CredentialProvider.class,
+                EmailAuthenticatorCredentialProviderFactory.PROVIDER_ID);
+    }
+
+    @Override
+    public List<RequiredActionFactory> getRequiredActions(KeycloakSession session) {
+        return Collections.singletonList((EmailAuthenticatorRequiredActionFactory) session.getKeycloakSessionFactory()
+                .getProviderFactory(RequiredActionProvider.class, EmailAuthenticatorRequiredAction.PROVIDER_ID));
     }
 
     @Override
@@ -175,6 +277,26 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
             emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
         } catch (EmailException eex) {
             logger.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
+        }
+    }
+
+    private int resolvePositiveInt(Map<String, String> configValues, String key, int defaultValue) {
+        String raw = configValues.get(key);
+        if (raw == null || raw.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(raw.trim());
+            if (parsed <= 0) {
+                logger.warnf("Configuration value for %s was non-positive ('%s'); falling back to default %d", key, raw,
+                        defaultValue);
+                return defaultValue;
+            }
+            return parsed;
+        } catch (NumberFormatException ex) {
+            logger.warnf("Configuration value for %s was invalid ('%s'); falling back to default %d", key, raw,
+                    defaultValue);
+            return defaultValue;
         }
     }
 }
