@@ -213,14 +213,41 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         context.success();
     }
 
-    private void handleInvalidCode(AuthenticationFlowContext context, UserModel user) {
-        AuthenticationExecutionModel execution = context.getExecution();
-        if (execution.isRequired()) {
-            context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
-            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-        } else if (execution.isConditional() || execution.isAlternative()) {
-            context.attempted();
+    private LoginFormsProvider prepareForm(AuthenticationFlowContext context, Long remainingSeconds) {
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
+        Long secondsToExpose = remainingSeconds != null ? remainingSeconds : getRemainingSeconds(session);
+        if (secondsToExpose != null && secondsToExpose > 0L)
+            form.setAttribute("resendAvailableInSeconds", secondsToExpose);
+
+        return form;
+    }
+
+    private Long getRemainingSeconds(AuthenticationSessionModel session) {
+        String rawResendAfter = session.getAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
+        if (rawResendAfter == null) {
+            return null;
+        }
+        Long resendAt = null;
+        try {
+            resendAt = Long.parseLong(rawResendAfter);
+        } catch (NumberFormatException ex) {
+            logger.warnf("Invalid resend availability timestamp '%s' for email authenticator; allowing resend", rawResendAfter);
+            session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
+            return null;
+        }
+        long remainingMillis = resendAt - System.currentTimeMillis();
+        return Math.max(0L, (remainingMillis + 999L) / 1000L);
+    }
+
+    private void applyFormMessage(LoginFormsProvider form, String messageKey, String field, Object... messageParams) {
+        if (messageKey == null) {
+            return;
+        }
+        if (field != null) {
+            form.addError(new FormMessage(field, messageKey, messageParams));
+        } else {
+            form.setError(messageKey, messageParams);
         }
     }
 
