@@ -236,14 +236,14 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
     }
 
     @Override
-    public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-        user.addRequiredAction(EmailAuthenticatorRequiredAction.PROVIDER_ID);
-    }
-
-    @Override
     public EmailAuthenticatorCredentialProvider getCredentialProvider(KeycloakSession session) {
         return (EmailAuthenticatorCredentialProvider) session.getProvider(CredentialProvider.class,
                 EmailAuthenticatorCredentialProviderFactory.PROVIDER_ID);
+    }
+
+    @Override
+    public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
+        user.addRequiredAction(EmailAuthenticatorRequiredAction.PROVIDER_ID);
     }
 
     @Override
