@@ -172,6 +172,9 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         return false;
     }
 
+    private record CodeContext(String storedCode, Long expiresAt, String submittedCode) {
+    }
+
     private CodeContext buildCodeContext(AuthenticationSessionModel session, MultivaluedMap<String, String> formData) {
         String storedCode = session.getAuthNote(EmailConstants.CODE);
         String ttlNote = session.getAuthNote(EmailConstants.CODE_TTL);
@@ -240,9 +243,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         session.removeAuthNote(EmailConstants.CODE);
         session.removeAuthNote(EmailConstants.CODE_TTL);
         session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
-    }
-
-    private record CodeContext(String storedCode, Long expiresAt, String submittedCode) {
     }
 
     @Override
