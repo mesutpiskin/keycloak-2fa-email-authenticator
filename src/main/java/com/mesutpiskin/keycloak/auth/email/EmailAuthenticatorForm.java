@@ -107,45 +107,20 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
             return;
         }
 
-        CodeContext codeContext = buildCodeContext(context.getAuthenticationSession(), formData);
-        if (!validateCodeContext(context, userModel, codeContext)) {
-            return;
-        }
-
-        if (codeContext.expiresAt() < System.currentTimeMillis()) {
-            handleExpiredCode(context, userModel);
-            return;
-        }
-
-        if (codeContext.submittedCode().equals(codeContext.storedCode())) {
-            handleSuccessfulValidation(context);
-        } else {
-            handleInvalidCode(context, userModel);
+        if (isValidCodeContext(context, userModel, formData)) {
+            resetEmailCode(context);
+            context.success();
         }
     }
 
     private boolean handleFormShortcuts(AuthenticationFlowContext context, MultivaluedMap<String, String> formData) {
         if (formData.containsKey("resend")) {
             AuthenticationSessionModel session = context.getAuthenticationSession();
-            String resendAvailableRaw = session.getAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
-            Long resendAvailableAt = null;
-            if (resendAvailableRaw != null) {
-                try {
-                    resendAvailableAt = Long.parseLong(resendAvailableRaw);
-                } catch (NumberFormatException ex) {
-                    logger.warnf("Invalid resend availability timestamp '%s' for email authenticator; allowing resend",
-                            resendAvailableRaw);
-                }
-            }
-
-            long now = System.currentTimeMillis();
-            if (resendAvailableAt != null && now < resendAvailableAt) {
-                long millisRemaining = resendAvailableAt - now;
-                long secondsRemaining = Math.max(1L, (millisRemaining + 999L) / 1000L);
-                LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
-                form.setError("email-authenticator-resend-cooldown", secondsRemaining);
-                Response response = form.createForm("email-code-form.ftl");
-                context.challenge(response);
+            Long remainingSeconds = getRemainingSeconds(session);
+            if (remainingSeconds != null && remainingSeconds > 0L) {
+                LoginFormsProvider form = prepareForm(context, remainingSeconds);
+                applyFormMessage(form, "email-authenticator-resend-cooldown", null, remainingSeconds);
+                context.challenge(form.createForm("email-code-form.ftl"));
                 return true;
             }
 
@@ -184,7 +159,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         return new CodeContext(storedCode, expiresAt, submittedCode);
     }
 
-    private boolean validateCodeContext(AuthenticationFlowContext context, UserModel user, CodeContext codeContext) {
+    private boolean isValidCodeContext(AuthenticationFlowContext context, UserModel user, MultivaluedMap<String, String> formData) {
+        CodeContext codeContext = buildCodeContext(context.getAuthenticationSession(), formData);
         if (codeContext.storedCode() == null || codeContext.expiresAt() == null) {
             context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
             Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
@@ -193,24 +169,29 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         }
 
         if (codeContext.submittedCode() == null || codeContext.submittedCode().isEmpty()) {
-            Response challengeResponse = challenge(context, Messages.MISSING_TOTP, EmailConstants.CODE);
-            context.challenge(challengeResponse);
+            context.challenge(challenge(context, Messages.MISSING_TOTP, EmailConstants.CODE));
             return false;
         }
 
-        return true;
-    }
+        if (codeContext.expiresAt() < System.currentTimeMillis()) {
+            context.getEvent().user(user).error(Errors.EXPIRED_CODE);
+            Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS, EmailConstants.CODE);
+            context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
+            return false;
+        }
 
-    private void handleExpiredCode(AuthenticationFlowContext context, UserModel user) {
-        context.getEvent().user(user).error(Errors.EXPIRED_CODE);
-        Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS,
-                EmailConstants.CODE);
-        context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
-    }
+        if (codeContext.submittedCode().equals(codeContext.storedCode()))
+            return true;
 
-    private void handleSuccessfulValidation(AuthenticationFlowContext context) {
-        resetEmailCode(context);
-        context.success();
+        // AuthenticationExecutionModel execution = context.getExecution();
+        // if (execution.isRequired()) {
+        context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
+        Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+        context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
+        // } else if (execution.isConditional() || execution.isAlternative()) {
+        //     context.attempted();
+        // }
+        return false;
     }
 
     private LoginFormsProvider prepareForm(AuthenticationFlowContext context, Long remainingSeconds) {
