@@ -83,6 +83,26 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         session.setAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER, Long.toString(now + (resendCooldown * 1000L)));
     }
 
+    private int resolvePositiveInt(Map<String, String> configValues, String key, int defaultValue) {
+        String raw = configValues.get(key);
+        if (raw == null || raw.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(raw.trim());
+            if (parsed <= 0) {
+                logger.warnf("Configuration value for %s was non-positive ('%s'); falling back to default %d", key, raw,
+                        defaultValue);
+                return defaultValue;
+            }
+            return parsed;
+        } catch (NumberFormatException ex) {
+            logger.warnf("Configuration value for %s was invalid ('%s'); falling back to default %d", key, raw,
+                    defaultValue);
+            return defaultValue;
+        }
+    }
+
     @Override
     public void action(AuthenticationFlowContext context) {
         UserModel userModel = context.getUser();
@@ -278,26 +298,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
             emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
         } catch (EmailException eex) {
             logger.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
-        }
-    }
-
-    private int resolvePositiveInt(Map<String, String> configValues, String key, int defaultValue) {
-        String raw = configValues.get(key);
-        if (raw == null || raw.isBlank()) {
-            return defaultValue;
-        }
-        try {
-            int parsed = Integer.parseInt(raw.trim());
-            if (parsed <= 0) {
-                logger.warnf("Configuration value for %s was non-positive ('%s'); falling back to default %d", key, raw,
-                        defaultValue);
-                return defaultValue;
-            }
-            return parsed;
-        } catch (NumberFormatException ex) {
-            logger.warnf("Configuration value for %s was invalid ('%s'); falling back to default %d", key, raw,
-                    defaultValue);
-            return defaultValue;
         }
     }
 }
