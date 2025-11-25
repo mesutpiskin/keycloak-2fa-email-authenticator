@@ -37,24 +37,15 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
-        challenge(context, null);
+        context.challenge(challenge(context, null));
     }
 
     @Override
     protected Response challenge(AuthenticationFlowContext context, String error, String field) {
         generateAndSendEmailCode(context);
-
-        LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
-        if (error != null) {
-            if (field != null) {
-                form.addError(new FormMessage(field, error));
-            } else {
-                form.setError(error);
-            }
-        }
-        Response response = form.createForm("email-code-form.ftl");
-        context.challenge(response);
-        return response;
+        LoginFormsProvider form = prepareForm(context, null);
+        applyFormMessage(form, error, field);
+        return form.createForm("email-code-form.ftl");
     }
 
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
@@ -159,7 +150,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
             }
 
             resetEmailCode(context);
-            challenge(context, null);
+            context.challenge(challenge(context, null));
             return true;
         }
 
