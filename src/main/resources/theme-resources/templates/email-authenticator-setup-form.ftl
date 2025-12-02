@@ -29,7 +29,7 @@
                     <div class="${properties.kcFormButtonsWrapperClass!}">
                         <input class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonLargeClass!}" type="submit" value="${msg("email-authenticator-setup-button")}" />
                         <#if isAppInitiatedAction??>
-                            <input class="${properties.kcButtonClass!} ${properties.kcButtonDefaultClass!} ${properties.kcButtonLargeClass!}" name="cancel" type="submit" value="${msg("doCancel")}" />
+                            <input class="${properties.kcButtonClass!} ${properties.kcButtonDefaultClass!} ${properties.kcButtonLargeClass!}" name="cancel-aia" type="submit" value="${msg("doCancel")}" />
                         </#if>
                     </div>
                 </div>
