@@ -8,14 +8,13 @@ import org.keycloak.authentication.AuthenticatorFactory;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
-import org.keycloak.models.credential.OTPCredentialModel;
 import org.keycloak.provider.ProviderConfigProperty;
 
 public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
-	
+
     public static final String PROVIDER_ID = "email-authenticator";
 	public static final EmailAuthenticatorForm SINGLETON = new EmailAuthenticatorForm();
-	
+
     @Override
     public String getId() {
         return PROVIDER_ID;
@@ -28,7 +27,7 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
 
     @Override
     public String getReferenceCategory() {
-    	return OTPCredentialModel.TYPE;
+    	return "email-authenticator";
     }
 
     @Override
@@ -46,8 +45,6 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
         return false;
     }
 
-
-
     @Override
     public String getHelpText() {
         return "Email otp authenticator.";
@@ -61,7 +58,11 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                         ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_LENGTH)),
                 new ProviderConfigProperty(EmailConstants.CODE_TTL, "Time-to-live",
                         "The time to live in seconds for the code to be valid.", ProviderConfigProperty.STRING_TYPE,
-                        String.valueOf(EmailConstants.DEFAULT_TTL)));
+                        String.valueOf(EmailConstants.DEFAULT_TTL)),
+                new ProviderConfigProperty(EmailConstants.FORCE_2FA, "Force 2FA",
+                        "If 2FA authentication is not configured, the user is forced to setup email Authentication.",
+                        ProviderConfigProperty.BOOLEAN_TYPE, Boolean.valueOf(EmailConstants.DEFAULT_FORCE_2FA)));
+
     }
 
     @Override
