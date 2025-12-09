@@ -59,6 +59,9 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                 new ProviderConfigProperty(EmailConstants.CODE_TTL, "Time-to-live",
                         "The time to live in seconds for the code to be valid.", ProviderConfigProperty.STRING_TYPE,
                         String.valueOf(EmailConstants.DEFAULT_TTL)),
+                new ProviderConfigProperty(EmailConstants.SIMULATION_MODE, "Simulation mode (dev only)",
+                        "In simulation mode, the mail won't be sent, but printed to the server logs",
+                        ProviderConfigProperty.BOOLEAN_TYPE, Boolean.valueOf(EmailConstants.DEFAULT_SIMULATION_MODE)),
                 new ProviderConfigProperty(EmailConstants.RESEND_COOLDOWN, "Resend cooldown",
                         "The minimum number of seconds a user must wait before requesting a new code.",
                         ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_RESEND_COOLDOWN)));
