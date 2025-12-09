@@ -96,11 +96,6 @@ public class ConditionalEmailAuthenticatorFormFactory extends EmailAuthenticator
 
         return Collections.unmodifiableList(list);
     }
-    
-    @Override
-    public boolean isUserSetupAllowed() {
-        return true;
-    }
 
     @Override
     public Authenticator create(KeycloakSession session) {
