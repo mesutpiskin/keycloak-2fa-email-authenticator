@@ -8,14 +8,13 @@ import org.keycloak.authentication.AuthenticatorFactory;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
-import org.keycloak.models.credential.OTPCredentialModel;
 import org.keycloak.provider.ProviderConfigProperty;
 
 public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
-	
+
     public static final String PROVIDER_ID = "email-authenticator";
-	public static final EmailAuthenticatorForm SINGLETON = new EmailAuthenticatorForm();
-	
+    public static final EmailAuthenticatorForm SINGLETON = new EmailAuthenticatorForm();
+
     @Override
     public String getId() {
         return PROVIDER_ID;
@@ -28,7 +27,7 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
 
     @Override
     public String getReferenceCategory() {
-    	return OTPCredentialModel.TYPE;
+        return EmailAuthenticatorCredentialModel.TYPE_ID;
     }
 
     @Override
@@ -43,10 +42,8 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
 
     @Override
     public boolean isUserSetupAllowed() {
-        return false;
+        return true;
     }
-
-
 
     @Override
     public String getHelpText() {
@@ -63,9 +60,11 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                         "The time to live in seconds for the code to be valid.", ProviderConfigProperty.STRING_TYPE,
                         String.valueOf(EmailConstants.DEFAULT_TTL)),
                 new ProviderConfigProperty(EmailConstants.SIMULATION_MODE, "Simulation mode (dev only)",
-                        "In simulation mode, the mail won't be sent, but printed to the server logs", ProviderConfigProperty.BOOLEAN_TYPE,
-                        Boolean.valueOf(EmailConstants.DEFAULT_SIMULATION_MODE))
-                );
+                        "In simulation mode, the mail won't be sent, but printed to the server logs",
+                        ProviderConfigProperty.BOOLEAN_TYPE, Boolean.valueOf(EmailConstants.DEFAULT_SIMULATION_MODE)),
+                new ProviderConfigProperty(EmailConstants.RESEND_COOLDOWN, "Resend cooldown",
+                        "The minimum number of seconds a user must wait before requesting a new code.",
+                        ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_RESEND_COOLDOWN)));
     }
 
     @Override
