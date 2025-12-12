@@ -38,7 +38,7 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
     enum OtpDecision {
         SKIP_OTP, SHOW_OTP, ABSTAIN
     }
-	
+
 	@Override
     public void authenticate(AuthenticationFlowContext context) {
 
