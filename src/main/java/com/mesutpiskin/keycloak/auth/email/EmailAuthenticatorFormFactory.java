@@ -61,8 +61,11 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                         String.valueOf(EmailConstants.DEFAULT_TTL)),
                 new ProviderConfigProperty(EmailConstants.FORCE_2FA, "Force 2FA",
                         "If 2FA authentication is not configured, the user is forced to setup email Authentication.",
-                        ProviderConfigProperty.BOOLEAN_TYPE, Boolean.valueOf(EmailConstants.DEFAULT_FORCE_2FA)));
-
+                        ProviderConfigProperty.BOOLEAN_TYPE, Boolean.valueOf(EmailConstants.DEFAULT_FORCE_2FA)),
+                new ProviderConfigProperty(EmailConstants.SIMULATION_MODE, "Simulation mode (dev only)",
+                        "In simulation mode, the mail won't be sent, but printed to the server logs", ProviderConfigProperty.BOOLEAN_TYPE,
+                        Boolean.valueOf(EmailConstants.DEFAULT_SIMULATION_MODE))
+                );
     }
 
     @Override
