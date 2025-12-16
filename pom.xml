@@ -14,7 +14,7 @@
         <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
-        <keycloak.version>26.0.0</keycloak.version>
+        <keycloak.version>26.4.6</keycloak.version>
         <maven-jar.plugin.version>3.4.2</maven-jar.plugin.version>
     </properties>
 
@@ -39,7 +39,6 @@
             <version>${keycloak.version}</version>
             <scope>provided</scope>
         </dependency>
-
     </dependencies>
 
     <build>
@@ -59,7 +58,6 @@
                         </manifestEntries>
                     </archive>
                 </configuration>
-                
             </plugin>
         </plugins>
         <finalName>keycloak-2fa-email-authenticator</finalName>

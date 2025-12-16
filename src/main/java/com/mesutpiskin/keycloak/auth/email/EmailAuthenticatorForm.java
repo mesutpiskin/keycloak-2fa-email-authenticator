@@ -3,6 +3,8 @@ package com.mesutpiskin.keycloak.auth.email;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
+import org.keycloak.authentication.CredentialValidator;
+import org.keycloak.authentication.Authenticator;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Errors;
@@ -17,7 +19,7 @@ import org.keycloak.services.messages.Messages;
 import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
 import org.keycloak.common.util.SecretGenerator;
-
+import org.keycloak.credential.CredentialProvider;
 import org.jboss.logging.Logger;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
@@ -25,7 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
+public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator implements Authenticator, CredentialValidator<EmailAuthCredentialProvider> {
 
       protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
 
@@ -140,17 +142,22 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator {
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return user.getEmail() != null;
+        return getCredentialProvider(session).isConfiguredFor(realm, user, getType(session));
     }
 
     @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-        // NOOP
+        user.addRequiredAction(EmailRequiredAction.PROVIDER_ID);
     }
 
     @Override
     public void close() {
         // NOOP
+    }
+
+    @Override
+    public EmailAuthCredentialProvider getCredentialProvider(KeycloakSession session) {
+            return (EmailAuthCredentialProvider)session.getProvider(CredentialProvider.class, EmailAuthCredentialProviderFactory.PROVIDER_ID);
     }
 
     private void sendEmailWithCode(KeycloakSession session, RealmModel realm, UserModel user, String code, int ttl) {
