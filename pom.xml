@@ -62,6 +62,6 @@
                 
             </plugin>
         </plugins>
-        <finalName>keycloak-2fa-email-authenticator</finalName>
+        <finalName>${project.artifactId}-v${project.version}</finalName>
     </build>
 </project>
