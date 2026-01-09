@@ -1,6 +1,6 @@
 # 🔒 Keycloak 2FA Email Authenticator
 
-A professional Keycloak Authentication Provider implementation for two-factor authentication (2FA) using One-Time Passwords (OTP) delivered via email through SMTP.
+A professional Keycloak Authentication Provider implementation for two-factor authentication (2FA) using One-Time Passwords (OTP) delivered via email. Supports multiple email providers (Keycloak SMTP, SendGrid, AWS SES, Mailgun).
 
 [![Keycloak Version](https://img.shields.io/badge/Keycloak-26.5.0-blue.svg)](https://www.keycloak.org/)
 [![Java Version](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
