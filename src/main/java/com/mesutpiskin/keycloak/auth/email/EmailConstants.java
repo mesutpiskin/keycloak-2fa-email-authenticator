@@ -68,6 +68,79 @@ public final class EmailConstants {
 	 */
 	public static final int DEFAULT_RESEND_COOLDOWN = 30;
 
+	// Email Provider Configuration
+
+	/**
+	 * Configuration key for selecting the email provider type.
+	 * Valid values: KEYCLOAK, SENDGRID, AWS_SES, MAILGUN
+	 */
+	public static final String EMAIL_PROVIDER_TYPE = "emailProviderType";
+
+	/**
+	 * Configuration key for SendGrid API key.
+	 * Required when EMAIL_PROVIDER_TYPE is set to SENDGRID.
+	 */
+	public static final String SENDGRID_API_KEY = "sendgridApiKey";
+
+	/**
+	 * Configuration key for SendGrid sender email address.
+	 * Required when EMAIL_PROVIDER_TYPE is set to SENDGRID.
+	 */
+	public static final String SENDGRID_FROM_EMAIL = "sendgridFromEmail";
+
+	/**
+	 * Configuration key for SendGrid sender display name.
+	 * Optional, defaults to the from email address.
+	 */
+	public static final String SENDGRID_FROM_NAME = "sendgridFromName";
+
+	/**
+	 * Configuration key for AWS SES region.
+	 * Required when EMAIL_PROVIDER_TYPE is set to AWS_SES.
+	 */
+	public static final String AWS_SES_REGION = "awsSesRegion";
+
+	/**
+	 * Configuration key for AWS Access Key ID.
+	 * Required when EMAIL_PROVIDER_TYPE is set to AWS_SES.
+	 */
+	public static final String AWS_ACCESS_KEY_ID = "awsAccessKeyId";
+
+	/**
+	 * Configuration key for AWS Secret Access Key.
+	 * Required when EMAIL_PROVIDER_TYPE is set to AWS_SES.
+	 */
+	public static final String AWS_SECRET_ACCESS_KEY = "awsSecretAccessKey";
+
+	/**
+	 * Configuration key for AWS SES sender email address.
+	 * Required when EMAIL_PROVIDER_TYPE is set to AWS_SES.
+	 */
+	public static final String AWS_SES_FROM_EMAIL = "awsSesFromEmail";
+
+	/**
+	 * Configuration key for AWS SES sender display name.
+	 * Optional, defaults to the from email address.
+	 */
+	public static final String AWS_SES_FROM_NAME = "awsSesFromName";
+
+	/**
+	 * Configuration key for enabling fallback to Keycloak SMTP.
+	 * When true, if the primary provider fails, the system will
+	 * automatically fall back to Keycloak's built-in SMTP.
+	 */
+	public static final String ENABLE_FALLBACK = "enableFallback";
+
+	/**
+	 * Default email provider type (Keycloak SMTP for backward compatibility).
+	 */
+	public static final String DEFAULT_EMAIL_PROVIDER = "KEYCLOAK";
+
+	/**
+	 * Default fallback setting (enabled for reliability).
+	 */
+	public static final boolean DEFAULT_ENABLE_FALLBACK = true;
+
 	/**
 	 * Millisecond rounding offset used for converting milliseconds to seconds.
 	 * Adding 999ms before division ensures proper ceiling rounding.
