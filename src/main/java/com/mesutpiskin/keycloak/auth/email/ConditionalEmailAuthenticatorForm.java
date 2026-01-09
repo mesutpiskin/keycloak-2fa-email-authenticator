@@ -5,6 +5,7 @@ import static com.mesutpiskin.keycloak.auth.email.ConditionalEmailAuthenticatorF
 import static com.mesutpiskin.keycloak.auth.email.ConditionalEmailAuthenticatorForm.OtpDecision.SKIP_OTP;
 import static org.keycloak.models.utils.KeycloakModelUtils.getRoleFromString;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -13,6 +14,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
@@ -46,7 +48,8 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
 	@Override
     public void authenticate(AuthenticationFlowContext context) {
 
-        Map<String, String> config = context.getAuthenticatorConfig().getConfig();
+        AuthenticatorConfigModel model = context.getAuthenticatorConfig();
+        Map<String, String> config = model != null ? model.getConfig() : Collections.emptyMap();
 
         if (tryConcludeBasedOn(voteForUserOtpControlAttribute(context.getUser(), config), context)) {
             return;
