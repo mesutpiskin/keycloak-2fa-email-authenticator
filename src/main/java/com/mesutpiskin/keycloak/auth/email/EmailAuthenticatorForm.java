@@ -7,10 +7,8 @@ import org.keycloak.authentication.CredentialValidator;
 import org.keycloak.authentication.RequiredActionFactory;
 import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.email.EmailException;
-import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Errors;
 import org.keycloak.forms.login.LoginFormsProvider;
-import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -136,7 +134,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
             logger.infof("***** SIMULATION MODE ***** Email code send to %s for user %s is: %s",
                     context.getUser().getEmail(), context.getUser().getUsername(), code);
         } else {
-            sendEmailWithCode(context.getSession(), context.getRealm(), context.getUser(), code, ttl);
+            sendEmailWithCode(context, code, ttl);
         }
         session.setAuthNote(EmailConstants.CODE, code);
         long now = System.currentTimeMillis();
@@ -373,29 +371,82 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         // NOOP
     }
 
-    private void sendEmailWithCode(KeycloakSession session, RealmModel realm, UserModel user, String code, int ttl) {
+    private void sendEmailWithCode(AuthenticationFlowContext context, String code, int ttl) {
+        KeycloakSession session = context.getSession();
+        RealmModel realm = context.getRealm();
+        UserModel user = context.getUser();
+
         if (user.getEmail() == null) {
             logger.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(),
                     user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
         }
 
-        Map<String, Object> mailBodyAttributes = new HashMap<>();
-        mailBodyAttributes.put("username", user.getUsername());
-        mailBodyAttributes.put("code", code);
-        mailBodyAttributes.put("ttl", ttl);
+        // Build email message with template data
+        Map<String, Object> templateData = new HashMap<>();
+        templateData.put("username", user.getUsername());
+        templateData.put("code", code);
+        templateData.put("ttl", ttl);
 
         String realmName = realm.getDisplayName() != null ? realm.getDisplayName() : realm.getName();
-        List<Object> subjectParams = List.of(realmName);
+        String subject = realmName + " access code";
+
+        com.mesutpiskin.keycloak.auth.email.model.EmailMessage message = com.mesutpiskin.keycloak.auth.email.model.EmailMessage
+                .builder()
+                .to(user.getEmail())
+                .subject(subject)
+                .templateData(templateData)
+                .build();
+
+        // Determine email provider from config
+        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
+        Map<String, String> configMap = config != null && config.getConfig() != null
+                ? config.getConfig()
+                : Map.of();
+
+        String providerTypeStr = configMap.getOrDefault(
+                EmailConstants.EMAIL_PROVIDER_TYPE,
+                EmailConstants.DEFAULT_EMAIL_PROVIDER);
+        com.mesutpiskin.keycloak.auth.email.model.EmailProviderType providerType = com.mesutpiskin.keycloak.auth.email.model.EmailProviderType
+                .fromString(providerTypeStr);
+
         try {
-            EmailTemplateProvider emailProvider = session.getProvider(EmailTemplateProvider.class);
-            emailProvider.setRealm(realm);
-            emailProvider.setUser(user);
-            // Don't forget to add the welcome-email.ftl (html and text) template to your
-            // theme.
-            emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
-        } catch (EmailException eex) {
-            logger.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
+            // Create email sender based on configuration
+            com.mesutpiskin.keycloak.auth.email.service.EmailSender emailSender = com.mesutpiskin.keycloak.auth.email.service.EmailSenderFactory
+                    .createEmailSender(
+                            providerType,
+                            configMap,
+                            session,
+                            realm,
+                            user);
+
+            // Send email
+            emailSender.sendEmail(message);
+            logger.infof("Email sent successfully via %s to %s",
+                    emailSender.getProviderName(), user.getEmail());
+
+        } catch (EmailException e) {
+            // Fallback to Keycloak SMTP if enabled
+            boolean fallbackEnabled = com.mesutpiskin.keycloak.auth.email.service.EmailSenderFactory
+                    .isFallbackEnabled(configMap);
+
+            if (fallbackEnabled
+                    && providerType != com.mesutpiskin.keycloak.auth.email.model.EmailProviderType.KEYCLOAK) {
+                logger.warnf(e, "Primary email provider (%s) failed, falling back to Keycloak SMTP",
+                        providerType.getDisplayName());
+                try {
+                    com.mesutpiskin.keycloak.auth.email.service.EmailSender fallbackSender = new com.mesutpiskin.keycloak.auth.email.service.impl.KeycloakEmailSender(
+                            session, realm, user);
+                    fallbackSender.sendEmail(message);
+                    logger.infof("Email sent successfully via fallback Keycloak SMTP to %s", user.getEmail());
+                } catch (EmailException fallbackEx) {
+                    logger.errorf(fallbackEx, "Fallback email provider also failed. realm=%s user=%s",
+                            realm.getId(), user.getUsername());
+                }
+            } else {
+                logger.errorf(e, "Failed to send access code email. realm=%s user=%s",
+                        realm.getId(), user.getUsername());
+            }
         }
     }
 }

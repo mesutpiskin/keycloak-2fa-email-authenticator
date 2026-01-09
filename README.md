@@ -36,8 +36,9 @@ A professional Keycloak Authentication Provider implementation for two-factor au
 This Keycloak extension enables email-based two-factor authentication by sending a verification code (OTP) to the user's registered email address during login. The authenticator integrates seamlessly with Keycloak's authentication flow system.
 
 **Key Capabilities:**
-- Send OTP codes via email through SMTP
-- Configurable email templates
+- Send OTP codes via multiple email providers (Keycloak SMTP, SendGrid, AWS SES, Mailgun)
+- Flexible provider selection with automatic fallback support
+- Customizable email templates
 - Conditional authentication support
 - Integration with Keycloak's authentication flow builder
 
@@ -46,11 +47,17 @@ This Keycloak extension enables email-based two-factor authentication by sending
 ## ✨ Features
 
 - ✅ Email-based OTP authentication
+- ✅ **Multiple email provider support** (Keycloak SMTP, SendGrid, AWS SES)
+- ✅ **Automatic fallback** to Keycloak SMTP if primary provider fails
+- ✅ **SendGrid integration** with API key authentication
+- ✅ **AWS SES integration** with IAM credentials and regional support
 - ✅ Customizable email templates
 - ✅ Conditional authentication flows
 - ✅ Multi-stage Docker build support
 - ✅ Compatible with Keycloak 26.x
 - ✅ Easy integration with existing authentication flows
+
+\* *Mailgun support coming soon*
 
 ---
 
@@ -224,6 +231,110 @@ Create a custom authentication flow with email OTP:
 **Example Flow Configuration:**
 
 ![Authentication Flow Example](docs/img/otp-form.png)
+
+### Email Provider Configuration
+
+The authenticator supports multiple email service providers for enhanced flexibility and reliability.
+
+#### Supported Providers
+
+| Provider | Description | Requirements |
+|----------|-------------|--------------|
+| **Keycloak SMTP** (Default) | Uses Keycloak's built-in SMTP configuration | Realm SMTP settings configured |
+| **SendGrid** | SendGrid cloud email service | SendGrid API key and from email |
+| **AWS SES** | Amazon Simple Email Service | AWS credentials, region, and verified sender |
+| **Mailgun** | Mailgun email delivery service | *Coming soon* |
+
+#### Configure Email Provider in Authentication Flow
+
+1. Navigate to **Authentication** → **Flows**
+2. Select your custom flow containing the **Email OTP** authenticator
+3. Click the **⚙️ (gear/settings)** icon next to **Email OTP**
+4. Configure the provider settings:
+
+**Option 1: Use Keycloak SMTP (Default)**
+```
+Email Provider: KEYCLOAK
+Enable Fallback to Keycloak SMTP: true
+```
+No additional configuration needed. Uses realm SMTP settings.
+
+**Option 2: Use SendGrid**
+```
+Email Provider: SENDGRID
+SendGrid API Key: SG.xxxxxxxxxxxxxxxxxxxx
+SendGrid From Email: noreply@yourdomain.com
+SendGrid From Name: Your Company Name  (optional)
+Enable Fallback to Keycloak SMTP: true  (recommended)
+```
+
+**Option 3: Use AWS SES**
+```
+Email Provider: AWS_SES
+AWS SES Region: us-east-1
+AWS Access Key ID: AKIAIOSFODNN7EXAMPLE
+AWS Secret Access Key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS SES From Email: noreply@yourdomain.com
+AWS SES From Name: Your Company Name  (optional)
+Enable Fallback to Keycloak SMTP: true  (recommended)
+```
+
+#### SendGrid Setup
+
+1. **Get SendGrid API Key:**
+   - Sign up at [SendGrid](https://sendgrid.com/)
+   - Navigate to **Settings** → **API Keys** → **Create API Key**
+   - Select **Full Access** or **Restricted Access** with **Mail Send** permissions
+   - Copy the API key (starts with `SG.`)
+
+2. **Verify Sender Identity:**
+   - Navigate to **Settings** → **Sender Authentication**
+   - Either verify a single sender email address OR
+   - Set up domain authentication for your sending domain
+
+3. **Configure in Keycloak:**
+   - Enter the API key in **SendGrid API Key** field
+   - Enter your verified sender email in **SendGrid From Email**
+   - Optionally set a friendly display name
+
+#### AWS SES Setup
+
+1. **Create IAM User with SES Permissions:**
+   - Go to AWS IAM Console → Users → Create User
+   - Attach policy: `AmazonSESFullAccess` (or create custom policy with `ses:SendEmail` permission)
+   - Create access keys and save the Access Key ID and Secret Access Key
+
+2. **Verify Sender Email or Domain:**
+   - Go to AWS SES Console → Verified identities
+   - Click **Create identity**
+   - For testing: Verify a single email address
+   - For production: Verify your domain (requires DNS configuration)
+   - Follow email/DNS verification steps
+
+3. **Request Production Access (if needed):**
+   - By default, AWS SES starts in **Sandbox mode**
+   - In Sandbox, you can only send to verified addresses
+   - To send to any email: Request production access in SES Console
+
+4. **Choose AWS Region:**
+   - SES is available in specific regions (e.g., us-east-1, eu-west-1)
+   - Choose region close to your users for lower latency
+   - Note: Verified identities are region-specific
+
+5. **Configure in Keycloak:**
+   - Select `AWS_SES` from Email Provider dropdown
+   - Enter AWS region (e.g., `us-east-1`)
+   - Enter IAM access key ID
+   - Enter IAM secret access key
+   - Enter verified sender email
+   - Optionally set sender display name
+
+#### Fallback Mechanism
+
+When **Enable Fallback to Keycloak SMTP** is enabled (recommended):
+- If the primary provider fails, the system automatically falls back to Keycloak's SMTP
+- Ensures email delivery reliability even if 3rd party service is unavailable
+- Fallback events are logged for monitoring
 
 ---
 
