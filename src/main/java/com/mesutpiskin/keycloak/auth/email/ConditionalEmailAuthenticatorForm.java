@@ -21,31 +21,99 @@ import org.keycloak.models.UserModel;
 
 import jakarta.ws.rs.core.MultivaluedMap;
 
+/**
+ * Conditional email authenticator that decides whether to enforce OTP based on
+ * user attributes,
+ * roles, HTTP headers, or configured defaults.
+ * <p>
+ * This authenticator extends {@link EmailAuthenticatorForm} and adds
+ * conditional logic to determine
+ * if two-factor authentication should be enforced, skipped, or abstained based
+ * on various criteria.
+ * </p>
+ * <p>
+ * Decision factors (evaluated in order):
+ * <ol>
+ * <li>User OTP control attribute</li>
+ * <li>User role (skip or force roles)</li>
+ * <li>HTTP header patterns</li>
+ * <li>Default fallback configuration</li>
+ * </ol>
+ * </p>
+ *
+ * @author Mesut Pişkin
+ * @version 26.0.0
+ * @since 1.0.0
+ */
 public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
 
+    /**
+     * Configuration value to skip OTP authentication.
+     */
     public static final String SKIP = "skip";
 
+    /**
+     * Configuration value to force OTP authentication.
+     */
     public static final String FORCE = "force";
 
+    /**
+     * Configuration key for the user attribute that controls OTP enforcement.
+     */
     public static final String OTP_CONTROL_USER_ATTRIBUTE = "otpControlAttribute";
 
+    /**
+     * Configuration key for the role that allows skipping OTP.
+     */
     public static final String SKIP_OTP_ROLE = "skipOtpRole";
 
+    /**
+     * Configuration key for the role that enforces OTP.
+     */
     public static final String FORCE_OTP_ROLE = "forceOtpRole";
 
+    /**
+     * Configuration key for HTTP header pattern that skips OTP.
+     */
     public static final String SKIP_OTP_FOR_HTTP_HEADER = "noOtpRequiredForHeaderPattern";
 
+    /**
+     * Configuration key for HTTP header pattern that enforces OTP.
+     */
     public static final String FORCE_OTP_FOR_HTTP_HEADER = "forceOtpForHeaderPattern";
 
+    /**
+     * Configuration key for the default OTP outcome when no other condition
+     * matches.
+     */
     public static final String DEFAULT_OTP_OUTCOME = "defaultOtpOutcome";
 
+    /**
+     * Cache for compiled regex patterns to avoid recompilation overhead.
+     */
     private static final Map<String, Pattern> patternCache = new ConcurrentHashMap<>();
 
+    /**
+     * Enum representing the decision outcome for OTP enforcement.
+     */
     enum OtpDecision {
-        SKIP_OTP, SHOW_OTP, ABSTAIN
+        /**
+         * Skip OTP authentication - user proceeds without entering a code.
+         */
+        SKIP_OTP,
+
+        /**
+         * Show OTP form - user must enter the email code.
+         */
+        SHOW_OTP,
+
+        /**
+         * Abstain from making a decision - defer to next evaluation criteria.
+         */
+        ABSTAIN
     }
-	
-	@Override
+
+    @Override
     public void authenticate(AuthenticationFlowContext context) {
 
         AuthenticatorConfigModel model = context.getAuthenticatorConfig();
@@ -59,7 +127,9 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
             return;
         }
 
-        if (tryConcludeBasedOn(voteForHttpHeaderMatchesPattern(context.getHttpRequest().getHttpHeaders().getRequestHeaders(), config), context)) {
+        if (tryConcludeBasedOn(
+                voteForHttpHeaderMatchesPattern(context.getHttpRequest().getHttpHeaders().getRequestHeaders(), config),
+                context)) {
             return;
         }
 
@@ -133,13 +203,15 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
         }
     }
 
-    private OtpDecision voteForHttpHeaderMatchesPattern(MultivaluedMap<String, String> requestHeaders, Map<String, String> config) {
+    private OtpDecision voteForHttpHeaderMatchesPattern(MultivaluedMap<String, String> requestHeaders,
+            Map<String, String> config) {
 
         if (!config.containsKey(FORCE_OTP_FOR_HTTP_HEADER) && !config.containsKey(SKIP_OTP_FOR_HTTP_HEADER)) {
             return ABSTAIN;
         }
 
-        //Inverted to allow white-lists, e.g. for specifying trusted remote hosts: X-Forwarded-Host: (1.2.3.4|1.2.3.5)
+        // Inverted to allow white-lists, e.g. for specifying trusted remote hosts:
+        // X-Forwarded-Host: (1.2.3.4|1.2.3.5)
         if (containsMatchingRequestHeader(requestHeaders, config.get(SKIP_OTP_FOR_HTTP_HEADER))) {
             return SKIP_OTP;
         }
@@ -159,7 +231,8 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
 
         Pattern pattern;
         try {
-            pattern = patternCache.computeIfAbsent(headerPattern, p -> Pattern.compile(p, Pattern.DOTALL | Pattern.CASE_INSENSITIVE));
+            pattern = patternCache.computeIfAbsent(headerPattern,
+                    p -> Pattern.compile(p, Pattern.DOTALL | Pattern.CASE_INSENSITIVE));
         } catch (PatternSyntaxException e) {
             logger.errorf("Invalid pattern syntax for header matching: %s", headerPattern);
             return false;

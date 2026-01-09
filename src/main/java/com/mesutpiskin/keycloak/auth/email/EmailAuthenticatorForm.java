@@ -30,16 +30,64 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Keycloak authenticator that implements two-factor authentication via email.
+ * <p>
+ * This authenticator generates a one-time password (OTP) and sends it to the
+ * user's
+ * registered email address. The user must enter the received code to complete
+ * authentication.
+ * </p>
+ * <p>
+ * Features include:
+ * <ul>
+ * <li>Configurable code length and TTL (time-to-live)</li>
+ * <li>Resend cooldown to prevent spam</li>
+ * <li>Simulation mode for testing without sending actual emails</li>
+ * <li>Brute force protection support</li>
+ * <li>Code expiration handling</li>
+ * </ul>
+ * </p>
+ *
+ * @author Mesut Pişkin
+ * @version 26.0.0
+ * @since 1.0.0
+ */
 public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         implements CredentialValidator<EmailAuthenticatorCredentialProvider> {
 
     protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
 
+    /**
+     * Initiates the authentication process by presenting the email OTP challenge to
+     * the user.
+     * <p>
+     * This method is called by Keycloak when the user reaches this authenticator in
+     * the flow.
+     * It generates and sends an email code, then displays the form for code entry.
+     * </p>
+     *
+     * @param context the authentication flow context containing user, session, and
+     *                realm information
+     */
     @Override
     public void authenticate(AuthenticationFlowContext context) {
         context.challenge(challenge(context, null));
     }
 
+    /**
+     * Creates the authentication challenge response with the email code entry form.
+     * <p>
+     * Generates and sends the email code if not already sent, prepares the form
+     * with
+     * any error messages, and returns the rendered form response.
+     * </p>
+     *
+     * @param context the authentication flow context
+     * @param error   optional error message key to display
+     * @param field   optional field name associated with the error
+     * @return the HTTP response containing the rendered form
+     */
     @Override
     protected Response challenge(AuthenticationFlowContext context, String error, String field) {
         generateAndSendEmailCode(context);
@@ -48,6 +96,23 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         return form.createForm("email-code-form.ftl");
     }
 
+    /**
+     * Generates a random email code and sends it to the user's registered email
+     * address.
+     * <p>
+     * If a code has already been generated for this session, this method returns
+     * early
+     * to prevent duplicate emails. The code is stored in the authentication session
+     * along
+     * with its expiration time and resend cooldown period.
+     * </p>
+     * <p>
+     * In simulation mode, the code is logged instead of being emailed, useful for
+     * development.
+     * </p>
+     *
+     * @param context the authentication flow context
+     */
     private void generateAndSendEmailCode(AuthenticationFlowContext context) {
         AuthenticatorConfigModel config = context.getAuthenticatorConfig();
         AuthenticationSessionModel session = context.getAuthenticationSession();
@@ -68,7 +133,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
 
         String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
         if (config != null && Boolean.parseBoolean(config.getConfig().get(EmailConstants.SIMULATION_MODE))) {
-            logger.infof("***** SIMULATION MODE ***** Email code send to %s for user %s is: %s", context.getUser().getEmail(), context.getUser().getUsername(), code);
+            logger.infof("***** SIMULATION MODE ***** Email code send to %s for user %s is: %s",
+                    context.getUser().getEmail(), context.getUser().getUsername(), code);
         } else {
             sendEmailWithCode(context.getSession(), context.getRealm(), context.getUser(), code, ttl);
         }
@@ -78,6 +144,20 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         session.setAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER, Long.toString(now + (resendCooldown * 1000L)));
     }
 
+    /**
+     * Resolves a positive integer configuration value with validation and fallback.
+     * <p>
+     * Parses the configuration value for the given key. If the value is missing,
+     * blank,
+     * not a valid integer, or non-positive, returns the default value and logs a
+     * warning.
+     * </p>
+     *
+     * @param configValues the configuration map
+     * @param key          the configuration key to resolve
+     * @param defaultValue the fallback value if parsing fails or value is invalid
+     * @return the parsed positive integer or the default value
+     */
     private int resolvePositiveInt(Map<String, String> configValues, String key, int defaultValue) {
         String raw = configValues.get(key);
         if (raw == null || raw.isBlank()) {
@@ -98,6 +178,16 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         }
     }
 
+    /**
+     * Processes the form submission when the user enters the email code.
+     * <p>
+     * Validates the submitted code against the stored code, checking for expiration
+     * and correctness. Handles special form actions like "resend" and "cancel".
+     * On successful validation, marks the authentication as successful.
+     * </p>
+     *
+     * @param context the authentication flow context
+     */
     @Override
     public void action(AuthenticationFlowContext context) {
         UserModel userModel = context.getUser();
@@ -163,7 +253,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         return new CodeContext(storedCode, expiresAt, submittedCode);
     }
 
-    private boolean isValidCodeContext(AuthenticationFlowContext context, UserModel user, MultivaluedMap<String, String> formData) {
+    private boolean isValidCodeContext(AuthenticationFlowContext context, UserModel user,
+            MultivaluedMap<String, String> formData) {
         CodeContext codeContext = buildCodeContext(context.getAuthenticationSession(), formData);
         if (codeContext.storedCode() == null || codeContext.expiresAt() == null) {
             context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
@@ -179,7 +270,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
 
         if (codeContext.expiresAt() < System.currentTimeMillis()) {
             context.getEvent().user(user).error(Errors.EXPIRED_CODE);
-            Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS, EmailConstants.CODE);
+            Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS,
+                    EmailConstants.CODE);
             context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
             return false;
         }
@@ -193,7 +285,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
         context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
         // } else if (execution.isConditional() || execution.isAlternative()) {
-        //     context.attempted();
+        // context.attempted();
         // }
         return false;
     }
@@ -217,12 +309,13 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         try {
             resendAt = Long.parseLong(rawResendAfter);
         } catch (NumberFormatException ex) {
-            logger.warnf("Invalid resend availability timestamp '%s' for email authenticator; allowing resend", rawResendAfter);
+            logger.warnf("Invalid resend availability timestamp '%s' for email authenticator; allowing resend",
+                    rawResendAfter);
             session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
             return null;
         }
         long remainingMillis = resendAt - System.currentTimeMillis();
-        return Math.max(0L, (remainingMillis + 999L) / 1000L);
+        return Math.max(0L, (remainingMillis + EmailConstants.MILLIS_ROUNDING_OFFSET) / 1000L);
     }
 
     private void applyFormMessage(LoginFormsProvider form, String messageKey, String field, Object... messageParams) {
@@ -282,7 +375,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
 
     private void sendEmailWithCode(KeycloakSession session, RealmModel realm, UserModel user, String code, int ttl) {
         if (user.getEmail() == null) {
-            logger.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(), user.getUsername());
+            logger.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(),
+                    user.getUsername());
             throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
         }
 
@@ -297,7 +391,8 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
             EmailTemplateProvider emailProvider = session.getProvider(EmailTemplateProvider.class);
             emailProvider.setRealm(realm);
             emailProvider.setUser(user);
-            // Don't forget to add the welcome-email.ftl (html and text) template to your theme.
+            // Don't forget to add the welcome-email.ftl (html and text) template to your
+            // theme.
             emailProvider.send("emailCodeSubject", subjectParams, "code-email.ftl", mailBodyAttributes);
         } catch (EmailException eex) {
             logger.errorf(eex, "Failed to send access code email. realm=%s user=%s", realm.getId(), user.getUsername());
