@@ -20,6 +20,7 @@ A professional Keycloak Authentication Provider implementation for two-factor au
 - [Configuration](#-configuration)
   - [Email Configuration](#email-configuration)
   - [Authentication Flow Setup](#authentication-flow-setup)
+- [Local Testing](#-local-testing)
 - [Development](#-development)
 - [Resources](#-resources)
 - [Localization](#-localization)
@@ -222,13 +223,11 @@ Create a custom authentication flow with email OTP:
 
 **Example Flow Configuration:**
 
-![Authentication Flow Example](static/otp-form.png)
+![Authentication Flow Example](docs/img/otp-form.png)
 
 ---
 
 ## 💻 Development
-
-
 
 ### Running Tests
 
@@ -237,6 +236,27 @@ mvn test
 ```
 
 > **Note:** Tests may fail on Java 25+ due to Mockito/ByteBuddy compatibility. Use Java 21 for development.
+
+---
+
+## 🧪 Local Testing
+
+For detailed instructions on testing this authenticator locally with Podman or Docker, see:
+
+**[📖 Local Testing Guide](docs/LOCAL_TESTING.md)**
+
+Quick start:
+```bash
+# Build and run with Podman
+podman build -t keycloak-email-auth:latest .
+podman run -d --name keycloak-test \
+  -p 8080:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  keycloak-email-auth:latest start-dev
+```
+
+Access admin console at: http://localhost:8080/admin
 
 ---
 
