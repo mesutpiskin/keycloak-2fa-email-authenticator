@@ -8,7 +8,9 @@ import static org.keycloak.models.utils.KeycloakModelUtils.getRoleFromString;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.models.RealmModel;
@@ -34,6 +36,8 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
     public static final String FORCE_OTP_FOR_HTTP_HEADER = "forceOtpForHeaderPattern";
 
     public static final String DEFAULT_OTP_OUTCOME = "defaultOtpOutcome";
+
+    private static final Map<String, Pattern> patternCache = new ConcurrentHashMap<>();
 
     enum OtpDecision {
         SKIP_OTP, SHOW_OTP, ABSTAIN
@@ -150,11 +154,13 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
             return false;
         }
 
-        //TODO cache RequestHeader Patterns
-        //TODO how to deal with pattern syntax exceptions?
-        // need CASE_INSENSITIVE flag so that we also have matches when the underlying container use a different case than what
-        // is usually expected (e.g.: vertx)
-        Pattern pattern = Pattern.compile(headerPattern, Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+        Pattern pattern;
+        try {
+            pattern = patternCache.computeIfAbsent(headerPattern, p -> Pattern.compile(p, Pattern.DOTALL | Pattern.CASE_INSENSITIVE));
+        } catch (PatternSyntaxException e) {
+            logger.errorf("Invalid pattern syntax for header matching: %s", headerPattern);
+            return false;
+        }
 
         for (Map.Entry<String, List<String>> entry : requestHeaders.entrySet()) {
 
