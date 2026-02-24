@@ -103,7 +103,10 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                         ProviderConfigProperty.BOOLEAN_TYPE, String.valueOf(EmailConstants.DEFAULT_SIMULATION_MODE)),
                 new ProviderConfigProperty(EmailConstants.RESEND_COOLDOWN, "Resend Cooldown (seconds)",
                         "The minimum number of seconds a user must wait before requesting a new code.",
-                        ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_RESEND_COOLDOWN)));
+                        ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_RESEND_COOLDOWN)),
+                new ProviderConfigProperty(EmailConstants.MAX_ATTEMPTS, "Max Code Attempts",
+                        "The maximum number of invalid code attempts before the code is invalidated and a new one must be requested.",
+                        ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_MAX_ATTEMPTS)));
     }
 
     @Override

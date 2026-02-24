@@ -68,6 +68,17 @@ public final class EmailConstants {
 	 */
 	public static final int DEFAULT_RESEND_COOLDOWN = 30;
 
+	/**
+	 * Configuration key for the maximum number of invalid code attempts
+	 * before the code is invalidated and the user must request a new one.
+	 */
+	public static final String MAX_ATTEMPTS = "maxAttempts";
+
+	/**
+	 * Default maximum number of invalid code attempts.
+	 */
+	public static final int DEFAULT_MAX_ATTEMPTS = 5;
+
 	// Email Provider Configuration
 
 	/**

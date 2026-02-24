@@ -55,6 +55,7 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         implements CredentialValidator<EmailAuthenticatorCredentialProvider> {
 
     protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
+    private static final String CODE_ATTEMPTS = "emailCodeAttempts";
 
     /**
      * Initiates the authentication process by presenting the email OTP challenge to
@@ -277,14 +278,29 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         if (codeContext.submittedCode().equals(codeContext.storedCode()))
             return true;
 
-        // AuthenticationExecutionModel execution = context.getExecution();
-        // if (execution.isRequired()) {
         context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
-        Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-        context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-        // } else if (execution.isConditional() || execution.isAlternative()) {
-        // context.attempted();
-        // }
+
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        int attempts = incrementAttempts(session);
+
+        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
+        Map<String, String> configValues = config != null && config.getConfig() != null
+                ? config.getConfig()
+                : Map.of();
+        int maxAttempts = resolvePositiveInt(configValues, EmailConstants.MAX_ATTEMPTS,
+                EmailConstants.DEFAULT_MAX_ATTEMPTS);
+
+        if (attempts >= maxAttempts) {
+            resetEmailCode(context);
+            LoginFormsProvider form = prepareForm(context, null);
+            form.setAttribute("maxAttemptsReached", true);
+            applyFormMessage(form, "email-authenticator-too-many-attempts", EmailConstants.CODE);
+            Response challengeResponse = form.createForm("email-code-form.ftl");
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
+        } else {
+            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
+        }
         return false;
     }
 
@@ -327,7 +343,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         }
     }
 
-    @Override
     protected String disabledByBruteForceError() {
         return Messages.INVALID_ACCESS_CODE;
     }
@@ -337,6 +352,21 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         session.removeAuthNote(EmailConstants.CODE);
         session.removeAuthNote(EmailConstants.CODE_TTL);
         session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
+        session.removeAuthNote(CODE_ATTEMPTS);
+    }
+
+    private int incrementAttempts(AuthenticationSessionModel session) {
+        String raw = session.getAuthNote(CODE_ATTEMPTS);
+        int attempts = 1;
+        if (raw != null) {
+            try {
+                attempts = Integer.parseInt(raw) + 1;
+            } catch (NumberFormatException ignored) {
+                // corrupt value, start over
+            }
+        }
+        session.setAuthNote(CODE_ATTEMPTS, Integer.toString(attempts));
+        return attempts;
     }
 
     @Override

@@ -1,14 +1,14 @@
 <#import "template.ftl" as layout>
 <@layout.registrationLayout displayMessage=!messagesPerField.existsError('emailCode'); section>
     <#if section="header">
-        ${msg("doLogIn")}
+        ${msg("email-authenticator-setup-verify-title")}
     <#elseif section="form">
-        <form id="kc-otp-login-form" class="${properties.kcFormClass!}" action="${url.loginAction}"
+        <form id="kc-email-authenticator-setup-verify-form" class="${properties.kcFormClass!}" action="${url.loginAction}"
             method="post">
 
             <div class="${properties.kcFormGroupClass!}">
                 <div class="${properties.kcLabelWrapperClass!}">
-                    <label for="emailCode" class="${properties.kcLabelClass!}">${msg("emailOtpForm")}</label>
+                    <label for="emailCode" class="${properties.kcLabelClass!}">${msg("email-authenticator-setup-verify-description")}</label>
                 </div>
 
             <div class="${properties.kcInputWrapperClass!}">
@@ -34,7 +34,7 @@
                 <div id="kc-form-buttons">
                     <div class="${properties.kcFormButtonsWrapperClass!}">
                         <#if !(maxAttemptsReached?? && maxAttemptsReached)>
-                            <input class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonLargeClass!}" name="login" type="submit" value="${msg("doLogIn")}" />
+                            <input class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonLargeClass!}" type="submit" value="${msg("email-authenticator-setup-verify-button")}" />
                         </#if>
                         <input class="${properties.kcButtonClass!} <#if maxAttemptsReached?? && maxAttemptsReached>${properties.kcButtonPrimaryClass!}<#else>${properties.kcButtonDefaultClass!}</#if> ${properties.kcButtonLargeClass!}" name="resend" type="submit" value="${msg("resendCode")}"/>
                         <input class="${properties.kcButtonClass!} ${properties.kcButtonDefaultClass!} ${properties.kcButtonLargeClass!}" name="cancel" type="submit" value="${msg("doCancel")}"/>
