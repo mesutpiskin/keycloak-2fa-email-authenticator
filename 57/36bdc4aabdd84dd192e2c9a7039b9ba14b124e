@@ -1,0 +1,28 @@
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorForm.java
+  s_16c3eb8c540175::t_600425f4505e8f 394-395,407-408
+src/test/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorCredentialProviderTest.java
+  s_16c3eb8c540175::t_5924b9952312c7 4-5,7-9,15,20,39,55,61,70-176
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorCredentialProvider.java
+  s_16c3eb8c540175::t_b0519886414092 10,40,43-69
+pom.xml
+  s_16c3eb8c540175::t_1b74c501fc2d82 8
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorRequiredAction.java
+  s_16c3eb8c540175::t_bd97a4b1f1f20c 264-265
+  s_16c3eb8c540175::t_5d5ba80a0d7928 50-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "5736bdc4aabdd84dd192e2c9a7039b9ba14b124e",
+  "prompts": {},
+  "sessions": {
+    "s_16c3eb8c540175": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d9761a3-75e3-4d19-84f3-986e4999e34b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
