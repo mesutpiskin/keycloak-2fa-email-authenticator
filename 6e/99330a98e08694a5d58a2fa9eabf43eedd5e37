@@ -1,0 +1,19 @@
+src/main/java/com/mesutpiskin/keycloak/auth/email/ConditionalEmailAuthenticatorForm.java
+  s_16c3eb8c540175::t_1c7b4c8ad5b556 281
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "6e99330a98e08694a5d58a2fa9eabf43eedd5e37",
+  "prompts": {},
+  "sessions": {
+    "s_16c3eb8c540175": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d9761a3-75e3-4d19-84f3-986e4999e34b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
