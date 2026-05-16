@@ -1,0 +1,19 @@
+.github/FUNDING.yml
+  s_16c3eb8c540175::t_5df74f0636fdc1 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "09b455921da4ea4e5e2564d8cf7fcff3dfc3a364",
+  "prompts": {},
+  "sessions": {
+    "s_16c3eb8c540175": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d9761a3-75e3-4d19-84f3-986e4999e34b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
