@@ -1,0 +1,19 @@
+pom.xml
+  s_16c3eb8c540175::t_31616c40249abc 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "d53847ea97a269c9e7bac376a02239dae9f653f8",
+  "prompts": {},
+  "sessions": {
+    "s_16c3eb8c540175": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d9761a3-75e3-4d19-84f3-986e4999e34b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
