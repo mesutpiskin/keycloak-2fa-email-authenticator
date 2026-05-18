@@ -1,0 +1,37 @@
+README.md
+  s_8ccc16fdfa79ca::t_8dadcd997487d0 49,53
+  s_8ccc16fdfa79ca::t_d2ef8797af784a 267
+  s_8ccc16fdfa79ca::t_b65c31b69e1cdb 423-446
+  s_8ccc16fdfa79ca::t_d4ba658b7369b9 362-372
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorFormFactory.java
+  s_8ccc16fdfa79ca::t_ade05a22c040bd 90-107
+src/test/java/com/mesutpiskin/keycloak/auth/email/MailgunEmailSenderTest.java
+  s_8ccc16fdfa79ca::t_1546a68452f828 1-258
+src/main/java/com/mesutpiskin/keycloak/auth/email/service/impl/MailgunEmailSender.java
+  s_8ccc16fdfa79ca::t_2027930961083a 1-74,76-194
+  s_8ccc16fdfa79ca::t_cbe98687c7b834 75
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailConstants.java
+  s_8ccc16fdfa79ca::t_f434716e1afc96 155-191
+src/main/java/com/mesutpiskin/keycloak/auth/email/service/EmailSenderFactory.java
+  s_8ccc16fdfa79ca::t_b1684542ea2ebf 5
+  s_8ccc16fdfa79ca::t_8f42c8ee0067e7 65
+  s_8ccc16fdfa79ca::t_5aa870b1447cec 134-161
+src/test/java/com/mesutpiskin/keycloak/auth/email/EmailSenderFactoryTest.java
+  s_8ccc16fdfa79ca::t_d5fdc76014958f 1-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "7e7ab3258e04c36671a4edb90cc39a235c6fcfec",
+  "prompts": {},
+  "sessions": {
+    "s_8ccc16fdfa79ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a6af74bc-9a79-429e-95e6-67ad77716a3e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
