@@ -1,0 +1,19 @@
+docs/superpowers/specs/2026-05-21-get-started-pages-design.md
+  s_5349c4165ee24a::t_5a3b65172089a2 1-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "e428a2441ff7349df50dfd24147c70bdbef546e8",
+  "prompts": {},
+  "sessions": {
+    "s_5349c4165ee24a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a567f2d-f9ab-4ee3-915e-1cbc202f3962",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
