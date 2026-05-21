@@ -1,0 +1,25 @@
+website/docs/for-ai-agents.mdx
+  s_5349c4165ee24a::t_8bfdcff07b046e 1-85
+website/static/llms.txt
+  s_5349c4165ee24a::t_6857fd995c2470 1-55
+website/sidebars.ts
+  s_5349c4165ee24a::t_8790801de974b2 6-7
+website/docs/get-started.mdx
+  s_5349c4165ee24a::t_d7ba0126b6992c 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "fa2d4f57b73f74b6c11d86e7911c2680bd543d68",
+  "prompts": {},
+  "sessions": {
+    "s_5349c4165ee24a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a567f2d-f9ab-4ee3-915e-1cbc202f3962",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
