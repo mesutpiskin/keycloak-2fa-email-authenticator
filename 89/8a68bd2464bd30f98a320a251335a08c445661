@@ -1,0 +1,31 @@
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorCredentialProvider.java
+  s_cac81a5c409248::t_af10aa9af29fcf 39,42,85
+src/test/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorCredentialProviderTest.java
+  s_cac81a5c409248::t_2d95d86af9dc7f 16,19-23,33,42,54-55,61,65,72-76,78,80
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailConstants.java
+  s_cac81a5c409248::t_d3ae95961ea732 205-209,211,215,217
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorRequiredAction.java
+  s_cac81a5c409248::t_a46d598950eef9 50-52
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorFormFactory.java
+  s_cac81a5c409248::t_994eadc81dbefa 130
+src/test/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorFormTest.java
+  s_cac81a5c409248::t_8ef4739fdfcad2 75-76,80,82-107,111-112,119-120
+src/main/java/com/mesutpiskin/keycloak/auth/email/EmailAuthenticatorForm.java
+  s_cac81a5c409248::t_f7ee67f6acfaa5 431-437,440-444,453-459,462
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "898a68bd2464bd30f98a320a251335a08c445661",
+  "prompts": {},
+  "sessions": {
+    "s_cac81a5c409248": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e499ea3-aa91-4272-b1b6-e9777f337714",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
