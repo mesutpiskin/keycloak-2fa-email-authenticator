@@ -1,0 +1,19 @@
+pom.xml
+  s_cac81a5c409248::t_75896e0ab67d06 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "16f2345914e8698663eedacda25a426eef60c717",
+  "prompts": {},
+  "sessions": {
+    "s_cac81a5c409248": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e499ea3-aa91-4272-b1b6-e9777f337714",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
