@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
@@ -48,7 +49,7 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
             return;
         }
 
-        if (tryConcludeBasedOn(voteForUserRole(context.getRealm(), context.getUser(), config), context)) {
+        if (tryConcludeBasedOn(voteForUserRole(context.getSession(), context.getRealm(), context.getUser(), config), context)) {
             return;
         }
 
@@ -173,30 +174,30 @@ public class ConditionalEmailAuthenticatorForm extends EmailAuthenticatorForm {
         return false;
     }
 
-    private OtpDecision voteForUserRole(RealmModel realm, UserModel user, Map<String, String> config) {
+    private OtpDecision voteForUserRole(KeycloakSession session, RealmModel realm, UserModel user, Map<String, String> config) {
 
         if (!config.containsKey(SKIP_OTP_ROLE) && !config.containsKey(FORCE_OTP_ROLE)) {
             return ABSTAIN;
         }
 
-        if (userHasRole(realm, user, config.get(SKIP_OTP_ROLE))) {
+        if (userHasRole(session, realm, user, config.get(SKIP_OTP_ROLE))) {
             return SKIP_OTP;
         }
 
-        if (userHasRole(realm, user, config.get(FORCE_OTP_ROLE))) {
+        if (userHasRole(session, realm, user, config.get(FORCE_OTP_ROLE))) {
             return SHOW_OTP;
         }
 
         return ABSTAIN;
     }
 
-    private boolean userHasRole(RealmModel realm, UserModel user, String roleName) {
+    private boolean userHasRole(KeycloakSession session, RealmModel realm, UserModel user, String roleName) {
 
         if (roleName == null) {
             return false;
         }
 
-        RoleModel role = getRoleFromString(realm, roleName);
+        RoleModel role = getRoleFromString(session, realm, roleName);
         if (role != null) {
             return user.hasRole(role);
         }
