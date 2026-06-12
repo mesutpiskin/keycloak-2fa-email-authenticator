@@ -1,0 +1,19 @@
+README.md
+  s_9e59c53c100f98::t_dd210e0289c23b 22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "43d68bc554248f27b6010eb0047e287b5c489469",
+  "prompts": {},
+  "sessions": {
+    "s_9e59c53c100f98": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6c85011-1722-452d-a131-e2e34c843012",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Mesut Pişkin <mesutpiskin@outlook.com>"
+    }
+  }
+}
