@@ -19,6 +19,10 @@ Full documentation — installation, configuration, template customization, and 
 - Optional **masked email display** on the OTP form for better UX after the code is sent
 - Multiple email delivery backends: Keycloak SMTP, SendGrid, AWS SES, and Mailgun
 
+## Related projects
+
+Need OTP via SMS, Telegram, WhatsApp, or Signal? See the sibling project: **[keycloak-2fa-messaging-authenticator](https://github.com/mesutpiskin/keycloak-2fa-messaging-authenticator)** — same approach, different channel.
+
 ## Quick Start
 
 The easiest way to get the JAR is via Maven Central. Use the version matching your Keycloak installation:
