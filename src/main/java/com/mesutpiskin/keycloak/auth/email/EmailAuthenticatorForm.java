@@ -429,19 +429,84 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
     }
 
     /**
-     * Eligibility for this authenticator is based on the user having a usable email
-     * address — no explicit enrollment step is required. A user with an email can
-     * always receive an email OTP. This keeps the authenticator decoupled from the
-     * realm-level credential store and makes the plugin appear as a valid option in
-     * "Try Another Way" alternative lists.
+     * Eligibility rules for the email authenticator:
+     * <ol>
+     * <li>A user with a stored email-authenticator credential is always
+     * configured.</li>
+     * <li>A user without an email address is never configured — the
+     * authenticator has nowhere to send the OTP.</li>
+     * <li>Otherwise, the user is reported as configured only when an admin has
+     * explicitly opted in to the "any user with email is eligible" behaviour by
+     * setting {@link EmailConstants#SKIP_SETUP skipSetup} = {@code true} on at
+     * least one email-authenticator execution in the realm.</li>
+     * </ol>
+     * The default ({@code skipSetup=false}) is intentional: it matches the
+     * Keycloak convention that {@code configuredFor=true} means "the user has
+     * enrolled this credential", so "Conditional - User Configured" sub-flows
+     * are not triggered for users who have neither enrolled nor been explicitly
+     * targeted by the admin's flow design.
      */
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
         if (user == null) {
             return false;
         }
+
         String email = user.getEmail();
-        return email != null && !email.isBlank();
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+
+        if (hasStoredEmailCredential(user)) {
+            return true;
+        }
+
+        return isSkipSetupEnabledForRealm(realm);
+    }
+
+    private boolean hasStoredEmailCredential(UserModel user) {
+        var credentialManager = user.credentialManager();
+        if (credentialManager == null) {
+            return false;
+        }
+        return credentialManager
+                .getStoredCredentialsByTypeStream(EmailAuthenticatorCredentialModel.TYPE_ID)
+                .findAny()
+                .isPresent();
+    }
+
+    /**
+     * Looks up the {@code skipSetup} flag on any email-authenticator (regular or
+     * conditional) execution in the realm. A single explicit {@code true} opts
+     * the realm into the permissive eligibility model; otherwise the strict
+     * default applies. This scan is intentionally kept in the form authenticator
+     * (not the credential provider) so the provider keeps the clean contract
+     * introduced for issue #129 (stored credentials only).
+     */
+    private boolean isSkipSetupEnabledForRealm(RealmModel realm) {
+        if (realm == null) {
+            return EmailConstants.DEFAULT_SKIP_SETUP;
+        }
+        return realm.getAuthenticationFlowsStream()
+                .flatMap(flow -> realm.getAuthenticationExecutionsStream(flow.getId()))
+                .filter(exec -> EmailAuthenticatorFormFactory.PROVIDER_ID.equals(exec.getAuthenticator())
+                        || ConditionalEmailAuthenticatorFormFactory.PROVIDER_ID.equals(exec.getAuthenticator()))
+                .map(exec -> {
+                    String configId = exec.getAuthenticatorConfig();
+                    if (configId == null) {
+                        return null;
+                    }
+                    AuthenticatorConfigModel cfg = realm.getAuthenticatorConfigById(configId);
+                    if (cfg == null || cfg.getConfig() == null) {
+                        return null;
+                    }
+                    return cfg.getConfig().get(EmailConstants.SKIP_SETUP);
+                })
+                .filter(value -> value != null && !value.isBlank())
+                .map(value -> Boolean.parseBoolean(value.trim()))
+                .filter(Boolean::booleanValue)
+                .findAny()
+                .orElse(EmailConstants.DEFAULT_SKIP_SETUP);
     }
 
     @Override
@@ -451,11 +516,13 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
     }
 
     /**
-     * No automatic required action is registered. Users with an email are already
-     * considered configured (see {@link #configuredFor}); users without an email
-     * cannot enrol via this authenticator and the flow surfaces the missing-email
-     * error at {@link #authenticate} time. Account-UI enrolment remains available
-     * via {@link EmailAuthenticatorRequiredAction}.
+     * No automatic required action is registered. Voluntary enrolment remains
+     * available via {@link EmailAuthenticatorRequiredAction} (account console).
+     * Admins who want to force enrolment for non-configured users can either
+     * add the 'email-authenticator-setup' required action manually, or set
+     * {@link EmailConstants#SKIP_SETUP skipSetup}={@code true} on the
+     * authenticator execution so users with an email are considered configured
+     * without enrolment.
      */
     @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {

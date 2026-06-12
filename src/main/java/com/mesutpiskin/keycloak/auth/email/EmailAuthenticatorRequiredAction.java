@@ -47,9 +47,11 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
 
     @Override
     public void evaluateTriggers(RequiredActionContext context) {
-        // No automatic trigger. Enrolment is voluntary via the account console — the
-        // login flow never requires it because EmailAuthenticatorForm.configuredFor
-        // treats any user with an email as eligible.
+        // No automatic trigger. Enrolment is voluntary via the account console;
+        // admins who want to force enrolment can add the
+        // 'email-authenticator-setup' required action manually, or set
+        // skipSetup=true on the email-authenticator execution to bypass
+        // enrolment entirely for users with an email address.
     }
 
     @Override

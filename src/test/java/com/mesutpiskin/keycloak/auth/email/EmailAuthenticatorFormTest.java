@@ -12,13 +12,16 @@ import org.keycloak.events.EventBuilder;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.http.HttpRequest;
 import org.keycloak.models.AuthenticationExecutionModel;
+import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -72,15 +75,19 @@ class EmailAuthenticatorFormTest {
     }
 
     @Test
-    @DisplayName("configuredFor returns true when the user has a non-blank email")
-    void testConfiguredFor_userWithEmail() {
+    @DisplayName("configuredFor returns true when the user has a stored email-authenticator credential")
+    void testConfiguredFor_withStoredCredential() {
         KeycloakSession session = mock(KeycloakSession.class);
         RealmModel realm = mock(RealmModel.class);
         UserModel user = mock(UserModel.class);
+        SubjectCredentialManager cm = mock(SubjectCredentialManager.class);
         when(user.getEmail()).thenReturn("alice@example.com");
+        when(user.credentialManager()).thenReturn(cm);
+        when(cm.getStoredCredentialsByTypeStream(EmailAuthenticatorCredentialModel.TYPE_ID))
+                .thenReturn(Stream.of(new EmailAuthenticatorCredentialModel()));
 
         assertTrue(authenticator.configuredFor(session, realm, user),
-                "Users with an email address must be eligible to receive an OTP without enrolment");
+                "An enrolled user must be reported as configured");
     }
 
     @Test
@@ -105,6 +112,91 @@ class EmailAuthenticatorFormTest {
 
         assertFalse(authenticator.configuredFor(session, realm, user),
                 "Blank emails should be treated as no email");
+    }
+
+    @Test
+    @DisplayName("configuredFor returns false by default for users with email but no stored credential — regression test for unwanted email-OTP prompt in Conditional - User Configured sub-flows (issue #108 follow-up)")
+    void testConfiguredFor_userWithEmail_noStoredCredential_noSkipSetupConfig_returnsFalse() {
+        KeycloakSession session = mock(KeycloakSession.class);
+        RealmModel realm = mock(RealmModel.class);
+        UserModel user = mock(UserModel.class);
+        SubjectCredentialManager cm = mock(SubjectCredentialManager.class);
+        when(user.getEmail()).thenReturn("alice@example.com");
+        when(user.credentialManager()).thenReturn(cm);
+        when(cm.getStoredCredentialsByTypeStream(EmailAuthenticatorCredentialModel.TYPE_ID))
+                .thenReturn(Stream.empty());
+        when(realm.getAuthenticationFlowsStream()).thenReturn(Stream.empty());
+
+        assertFalse(authenticator.configuredFor(session, realm, user),
+                "When no admin has opted in via skipSetup=true, a non-enrolled user must not be reported as configured — otherwise 'Conditional - User Configured' sub-flows trigger unexpectedly");
+    }
+
+    @Test
+    @DisplayName("configuredFor returns true when an admin has set skipSetup=true on any email-authenticator execution and the user has an email")
+    void testConfiguredFor_skipSetupTrue_userWithEmail_returnsTrue() {
+        KeycloakSession session = mock(KeycloakSession.class);
+        RealmModel realm = mock(RealmModel.class);
+        UserModel user = mock(UserModel.class);
+        SubjectCredentialManager cm = mock(SubjectCredentialManager.class);
+        AuthenticationFlowModel flow = mock(AuthenticationFlowModel.class);
+        AuthenticationExecutionModel exec = mock(AuthenticationExecutionModel.class);
+        AuthenticatorConfigModel cfg = mock(AuthenticatorConfigModel.class);
+
+        when(user.getEmail()).thenReturn("alice@example.com");
+        when(user.credentialManager()).thenReturn(cm);
+        when(cm.getStoredCredentialsByTypeStream(EmailAuthenticatorCredentialModel.TYPE_ID))
+                .thenReturn(Stream.empty());
+
+        when(flow.getId()).thenReturn("flow-1");
+        when(realm.getAuthenticationFlowsStream()).thenReturn(Stream.of(flow));
+        when(realm.getAuthenticationExecutionsStream("flow-1")).thenReturn(Stream.of(exec));
+        when(exec.getAuthenticator()).thenReturn(EmailAuthenticatorFormFactory.PROVIDER_ID);
+        when(exec.getAuthenticatorConfig()).thenReturn("cfg-1");
+        when(realm.getAuthenticatorConfigById("cfg-1")).thenReturn(cfg);
+        when(cfg.getConfig()).thenReturn(Map.of(EmailConstants.SKIP_SETUP, "true"));
+
+        assertTrue(authenticator.configuredFor(session, realm, user),
+                "skipSetup=true is the explicit opt-in for the 'any user with email is eligible' behaviour");
+    }
+
+    @Test
+    @DisplayName("configuredFor returns false when skipSetup=true is opted in but the user has no email")
+    void testConfiguredFor_skipSetupTrue_noEmail_returnsFalse() {
+        KeycloakSession session = mock(KeycloakSession.class);
+        RealmModel realm = mock(RealmModel.class);
+        UserModel user = mock(UserModel.class);
+        when(user.getEmail()).thenReturn(null);
+
+        assertFalse(authenticator.configuredFor(session, realm, user),
+                "skipSetup cannot rescue a user with no email — the authenticator has nowhere to send the code");
+    }
+
+    @Test
+    @DisplayName("configuredFor returns false when skipSetup is explicitly false on every execution (issue #108 follow-up scenario)")
+    void testConfiguredFor_skipSetupFalseEverywhere_returnsFalse() {
+        KeycloakSession session = mock(KeycloakSession.class);
+        RealmModel realm = mock(RealmModel.class);
+        UserModel user = mock(UserModel.class);
+        SubjectCredentialManager cm = mock(SubjectCredentialManager.class);
+        AuthenticationFlowModel flow = mock(AuthenticationFlowModel.class);
+        AuthenticationExecutionModel exec = mock(AuthenticationExecutionModel.class);
+        AuthenticatorConfigModel cfg = mock(AuthenticatorConfigModel.class);
+
+        when(user.getEmail()).thenReturn("alice@example.com");
+        when(user.credentialManager()).thenReturn(cm);
+        when(cm.getStoredCredentialsByTypeStream(EmailAuthenticatorCredentialModel.TYPE_ID))
+                .thenReturn(Stream.empty());
+
+        when(flow.getId()).thenReturn("flow-1");
+        when(realm.getAuthenticationFlowsStream()).thenReturn(Stream.of(flow));
+        when(realm.getAuthenticationExecutionsStream("flow-1")).thenReturn(Stream.of(exec));
+        when(exec.getAuthenticator()).thenReturn(EmailAuthenticatorFormFactory.PROVIDER_ID);
+        when(exec.getAuthenticatorConfig()).thenReturn("cfg-1");
+        when(realm.getAuthenticatorConfigById("cfg-1")).thenReturn(cfg);
+        when(cfg.getConfig()).thenReturn(Map.of(EmailConstants.SKIP_SETUP, "false"));
+
+        assertFalse(authenticator.configuredFor(session, realm, user),
+                "An admin who explicitly disables skipSetup must get the strict, enrolment-only behaviour");
     }
 
     @Test

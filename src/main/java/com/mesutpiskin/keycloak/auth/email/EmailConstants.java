@@ -202,20 +202,32 @@ public final class EmailConstants {
 	public static final boolean DEFAULT_SHOW_MASKED_EMAIL_ON_OTP_FORM = false;
 
 	/**
-	 * @deprecated The {@code skipSetup} configuration flag is no longer read by the
-	 * authenticator. Email-OTP eligibility is now derived solely from whether the
-	 * user has an email address, so explicit enrolment is never required for the
-	 * login flow. The constant is kept so existing realm configurations containing
-	 * the key continue to deserialize without error.
+	 * Configuration key controlling whether users with an email address but no
+	 * stored email-authenticator credential are reported as configured by
+	 * {@link com.mesutpiskin.keycloak.auth.email.EmailAuthenticatorForm#configuredFor}.
+	 * <p>
+	 * When {@code true}, any user with an email is eligible to receive an OTP
+	 * without prior enrolment — useful for admin-provisioned accounts (#112) and
+	 * for showing the plugin in Keycloak's "Try Another Way" alternative list
+	 * (#50).
+	 * </p>
+	 * <p>
+	 * When {@code false} (the default), only users with a stored credential are
+	 * reported as configured, matching Keycloak's convention for built-in
+	 * authenticators. This is the setting "Conditional - User Configured"
+	 * sub-flows expect, so non-enrolled users are not unexpectedly prompted for
+	 * an email OTP (#108 follow-up).
+	 * </p>
 	 */
-	@Deprecated
 	public static final String SKIP_SETUP = "skipSetup";
 
 	/**
-	 * @deprecated See {@link #SKIP_SETUP}.
+	 * Default value for {@link #SKIP_SETUP}. {@code false} is the strict,
+	 * convention-aligned default so conditional sub-flows behave as admins
+	 * expect; opt in to the permissive behaviour by setting the flag to
+	 * {@code true} on the email-authenticator execution.
 	 */
-	@Deprecated
-	public static final boolean DEFAULT_SKIP_SETUP = true;
+	public static final boolean DEFAULT_SKIP_SETUP = false;
 
 	/**
 	 * Millisecond rounding offset used for converting milliseconds to seconds.
