@@ -230,6 +230,33 @@ public final class EmailConstants {
 	public static final boolean DEFAULT_SKIP_SETUP = false;
 
 	/**
+	 * Configuration key controlling whether the enrolment (required action)
+	 * auto-enrols users whose email address is already verified
+	 * ({@link org.keycloak.models.UserModel#isEmailVerified()}), skipping the
+	 * setup verification code.
+	 * <p>
+	 * When {@code true}, users whose email is already verified are enrolled
+	 * silently: the email-authenticator credential is created without sending or
+	 * asking for a setup code, because Keycloak has already proven the user
+	 * controls the mailbox. The credential is still stored, so email 2FA is
+	 * enforced on subsequent logins as usual.
+	 * </p>
+	 * <p>
+	 * Only opt in when you trust how {@code emailVerified} is set in your realm
+	 * (admin-provisioned accounts, imports or IdP mappers can set it without a
+	 * real verification). Users with an unverified email always go through the
+	 * normal code-verification flow regardless of this flag.
+	 * </p>
+	 */
+	public static final String AUTO_ENROL_IF_EMAIL_VERIFIED = "autoEnrolIfEmailVerified";
+
+	/**
+	 * Default value for {@link #AUTO_ENROL_IF_EMAIL_VERIFIED}. {@code false} is
+	 * the strict default: enrolment always requires a fresh verification code.
+	 */
+	public static final boolean DEFAULT_AUTO_ENROL_IF_EMAIL_VERIFIED = false;
+
+	/**
 	 * Millisecond rounding offset used for converting milliseconds to seconds.
 	 * Adding 999ms before division ensures proper ceiling rounding.
 	 */
