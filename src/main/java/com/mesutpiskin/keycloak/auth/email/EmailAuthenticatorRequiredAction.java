@@ -163,6 +163,7 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
                     form.setAttribute("maxAttemptsReached", true);
                     form.setAttribute("codeLength", resolvePositiveInt(configMap, EmailConstants.CODE_LENGTH,
                             EmailConstants.DEFAULT_LENGTH));
+                    EmailMasking.applyToForm(form, user, configMap);
                     form.setError(Messages.TOO_MANY_ATTEMPTS);
                     context.challenge(form.createForm(VERIFY_TEMPLATE));
                 } else {
@@ -313,6 +314,7 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
         Map<String, String> configMap = findAuthenticatorConfig(context);
         int codeLength = resolvePositiveInt(configMap, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
         form.setAttribute("codeLength", codeLength);
+        EmailMasking.applyToForm(form, context.getUser(), configMap);
 
         if (error != null) {
             form.setError(error, errorParams);

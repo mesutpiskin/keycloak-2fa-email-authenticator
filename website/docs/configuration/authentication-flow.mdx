@@ -155,7 +155,7 @@ Click the **⚙️ Settings** icon on the **"Email OTP"** row to open the authen
 | **Simulation mode** | Log codes to server logs instead of sending emails | `false` | `false` |
 | **Resend cooldown** | Seconds a user must wait before requesting a new code | `30` | `60` |
 | **Max code attempts** | Wrong attempts allowed before the code is invalidated | `5` | `3` |
-| **Show masked email on OTP form** | Show a masked version of the destination email on the OTP screen | `false` | `true` |
+| **Show masked email on OTP form** | Show a masked version of the destination email on the OTP login and enrollment screens | `false` | `true` |
 | **Skip setup** | Skip enrollment for users who already have an email address | `true` | `true` |
 
 ### Setting details
@@ -185,7 +185,9 @@ Prevents users from spamming the "Resend code" button. The default of `30` secon
 After this many wrong attempts, the current code is invalidated and the user must request a new one. Lower values (e.g. `3`) make brute-forcing harder but may frustrate users who mistype frequently.
 
 #### Show masked email on OTP form
-When enabled, the authenticator injects a server-generated `maskedEmail` attribute into the OTP login form and displays it to the user, for example `u***e@example.com`. This improves UX by confirming where the code was sent without exposing the full address.
+When enabled, the authenticator injects a server-generated `maskedEmail` attribute into the OTP form and displays it to the user, for example `u***e@example.com`. This improves UX by confirming where the code was sent without exposing the full address.
+
+This applies both to the OTP login form and to the verification step of enrollment, so the user knows which mailbox to check in either case.
 
 This setting is intentionally implemented server-side. It does **not** depend on `${user.email!}` being present in the FreeMarker login template context.
 
