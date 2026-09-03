@@ -243,7 +243,7 @@ Click **⚙️ (Settings)** icon on "Email OTP" row:
 - **Max code attempts:** 5
 - **Show Masked Email on OTP Form:** false by default
 
-If you enable **Show Masked Email on OTP Form**, the login form shows a server-generated masked value such as `u***e@example.com` after the OTP is sent. This does not rely on `${user.email!}` being available in the Freemarker template context.
+If you enable **Show Masked Email on OTP Form**, the login form and the enrollment verification form show a server-generated masked value such as `u***e@example.com` after the OTP is sent. This does not rely on `${user.email!}` being available in the Freemarker template context.
 
 ---
 
