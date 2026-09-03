@@ -235,8 +235,8 @@ podman logs -f keycloak-test | grep "SIMULATION MODE"
 3. Login as `testuser`
 4. Expected: the OTP screen shows a masked destination such as `t***r@example.com`
 5. Confirm the full email address is not displayed
-6. Start enrollment of the email authenticator
-7. Expected: the verification screen shows the same masked destination
+6. In **Authentication → Required actions**, open **⚙️** on **Set up Email Authenticator** and enable the masked-email setting (enrollment sending settings can also be configured here; if none are saved, enrollment falls back to the first Email OTP execution config)
+7. Start enrollment: expected masked destination on the verification screen, independently of the login setting
 
 ### Test 7 — Language Support
 

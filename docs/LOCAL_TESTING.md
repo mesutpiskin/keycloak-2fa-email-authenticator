@@ -243,7 +243,9 @@ Click **⚙️ (Settings)** icon on "Email OTP" row:
 - **Max code attempts:** 5
 - **Show Masked Email on OTP Form:** false by default
 
-If you enable **Show Masked Email on OTP Form**, the login form and the enrollment verification form show a server-generated masked value such as `u***e@example.com` after the OTP is sent. This does not rely on `${user.email!}` being available in the Freemarker template context.
+If you enable **Show Masked Email on OTP Form**, the login form shows a server-generated masked value such as `u***e@example.com` after the OTP is sent. This does not rely on `${user.email!}` being available in the Freemarker template context.
+
+Enrollment is configured on **Authentication → Required actions → Set up Email Authenticator** (⚙️). You can set the email provider, TTL, code length, cooldown, max attempts, simulation mode, and the masked-email toggle there. If no sending setting is saved on the required action, enrollment falls back to the first Email OTP execution config in the realm. The masked-email toggle on the required action is independent of the login OTP setting.
 
 ---
 

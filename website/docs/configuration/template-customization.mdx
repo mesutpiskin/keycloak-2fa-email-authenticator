@@ -76,6 +76,9 @@ The authenticator ships with 11 built-in languages. For the full list, how to ad
 
 ## OTP Login Form Note
 
-If you want to show the destination email address on the OTP login or enrollment screen, prefer the built-in authenticator setting **Show masked email on OTP form** instead of relying on `${user.email!}` in the FreeMarker template.
+If you want to show the destination email address on the OTP screens, prefer the built-in **Show masked email on OTP form** settings instead of relying on `${user.email!}` in the FreeMarker template:
 
-When that setting is enabled, a server-generated `maskedEmail` value is passed to the form template. This is more reliable across Keycloak versions because the login template context does not always expose a populated `user` object during the OTP step.
+- on the Email OTP execution, for the **login** OTP form
+- on the **Set up Email Authenticator** required action, for the **enrollment** verification form
+
+When enabled, a server-generated `maskedEmail` value is passed to the form template. This is more reliable across Keycloak versions because the login template context does not always expose a populated `user` object during the OTP step.

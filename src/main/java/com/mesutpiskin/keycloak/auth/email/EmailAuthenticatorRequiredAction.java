@@ -24,6 +24,9 @@ import com.mesutpiskin.keycloak.auth.email.service.EmailSenderFactory;
 import com.mesutpiskin.keycloak.auth.email.service.impl.KeycloakEmailSender;
 
 import org.keycloak.models.AuthenticatorConfigModel;
+import org.keycloak.models.RequiredActionConfigModel;
+
+import org.keycloak.provider.ProviderConfigProperty;
 
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
@@ -153,7 +156,7 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
                 challengeVerifyForm(context, Messages.MISSING_CODE);
                 break;
             case INVALID:
-                Map<String, String> configMap = findAuthenticatorConfig(context);
+                Map<String, String> configMap = sendingConfig(context);
                 int maxAttempts = resolvePositiveInt(configMap, EmailConstants.MAX_ATTEMPTS,
                         EmailConstants.DEFAULT_MAX_ATTEMPTS);
                 int attempts = incrementAttempts(session);
@@ -163,7 +166,7 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
                     form.setAttribute("maxAttemptsReached", true);
                     form.setAttribute("codeLength", resolvePositiveInt(configMap, EmailConstants.CODE_LENGTH,
                             EmailConstants.DEFAULT_LENGTH));
-                    EmailMasking.applyToForm(form, user, configMap);
+                    EmailMasking.applyToForm(form, user, requiredActionConfig(context));
                     form.setError(Messages.TOO_MANY_ATTEMPTS);
                     context.challenge(form.createForm(VERIFY_TEMPLATE));
                 } else {
@@ -189,7 +192,7 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
         KeycloakSession keycloakSession = context.getSession();
         RealmModel realm = context.getRealm();
 
-        Map<String, String> configMap = findAuthenticatorConfig(context);
+        Map<String, String> configMap = sendingConfig(context);
 
         int length = resolvePositiveInt(configMap, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
         int ttl = resolvePositiveInt(configMap, EmailConstants.CODE_TTL, EmailConstants.DEFAULT_TTL);
@@ -261,6 +264,28 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
         }
     }
 
+    private Map<String, String> sendingConfig(RequiredActionContext context) {
+        Map<String, String> raConfig = requiredActionConfig(context);
+        return hasSendingConfig(raConfig) ? raConfig : findAuthenticatorConfig(context);
+    }
+
+    static boolean hasSendingConfig(Map<String, String> config) {
+        return EmailAuthenticatorFormFactory.SENDING_CONFIG_PROPERTIES.stream()
+                .map(ProviderConfigProperty::getName)
+                .anyMatch(key -> {
+                    String value = config.get(key);
+                    return value != null && !value.isBlank();
+                });
+    }
+
+    private static Map<String, String> requiredActionConfig(RequiredActionContext context) {
+        RequiredActionConfigModel config = context.getConfig();
+        if (config == null || config.getConfig() == null) {
+            return Map.of();
+        }
+        return config.getConfig();
+    }
+
     private Map<String, String> findAuthenticatorConfig(RequiredActionContext context) {
         RealmModel realm = context.getRealm();
 
@@ -311,10 +336,10 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
             form.setAttribute("resendAvailableInSeconds", remaining);
         }
 
-        Map<String, String> configMap = findAuthenticatorConfig(context);
+        Map<String, String> configMap = sendingConfig(context);
         int codeLength = resolvePositiveInt(configMap, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
         form.setAttribute("codeLength", codeLength);
-        EmailMasking.applyToForm(form, context.getUser(), configMap);
+        EmailMasking.applyToForm(form, context.getUser(), requiredActionConfig(context));
 
         if (error != null) {
             form.setError(error, errorParams);

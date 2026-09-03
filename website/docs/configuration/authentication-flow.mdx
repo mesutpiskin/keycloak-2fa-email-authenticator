@@ -155,7 +155,7 @@ Click the **⚙️ Settings** icon on the **"Email OTP"** row to open the authen
 | **Simulation mode** | Log codes to server logs instead of sending emails | `false` | `false` |
 | **Resend cooldown** | Seconds a user must wait before requesting a new code | `30` | `60` |
 | **Max code attempts** | Wrong attempts allowed before the code is invalidated | `5` | `3` |
-| **Show masked email on OTP form** | Show a masked version of the destination email on the OTP login and enrollment screens | `false` | `true` |
+| **Show masked email on OTP form** | Show a masked version of the destination email on the OTP **login** screen | `false` | `true` |
 | **Skip setup** | Skip enrollment for users who already have an email address | `true` | `true` |
 
 ### Setting details
@@ -185,16 +185,40 @@ Prevents users from spamming the "Resend code" button. The default of `30` secon
 After this many wrong attempts, the current code is invalidated and the user must request a new one. Lower values (e.g. `3`) make brute-forcing harder but may frustrate users who mistype frequently.
 
 #### Show masked email on OTP form
-When enabled, the authenticator injects a server-generated `maskedEmail` attribute into the OTP form and displays it to the user, for example `u***e@example.com`. This improves UX by confirming where the code was sent without exposing the full address.
-
-This applies both to the OTP login form and to the verification step of enrollment, so the user knows which mailbox to check in either case.
+When enabled, the authenticator injects a server-generated `maskedEmail` attribute into the OTP login form and displays it to the user, for example `u***e@example.com`. This improves UX by confirming where the code was sent without exposing the full address.
 
 This setting is intentionally implemented server-side. It does **not** depend on `${user.email!}` being present in the FreeMarker login template context.
+
+It applies to the **login** OTP screen only. Enrollment has a separate toggle on the required action (see below).
 
 #### Skip setup
 When `true`, users who already have an email address on their Keycloak account skip the enrollment required action and go straight to the OTP prompt. This is the recommended setting when an admin has enforced 2FA for existing users — they are not forced through a setup wizard on their next login.
 
 When `false`, every user must explicitly enroll before they can use email OTP, even if they already have an email on their account.
+
+## Enrollment required action
+
+Enrollment (`Set up Email Authenticator`) is configured under **Authentication → Required actions**, not on the Email OTP execution.
+
+| Setting | Description | Default |
+| --- | --- | --- |
+| **Email provider** | Provider used to send the enrollment verification code | `KEYCLOAK` |
+| **SendGrid / AWS SES / Mailgun** | Provider credentials and sender settings | — |
+| **Enable fallback to Keycloak SMTP** | Fall back to realm SMTP when the primary provider fails | `true` |
+| **Code length** | Number of digits in the enrollment code | `6` |
+| **Time-to-live** | Seconds before the enrollment code expires | `300` |
+| **Simulation mode** | Log codes to server logs instead of sending emails | `false` |
+| **Resend cooldown** | Seconds before the user can request a new enrollment code | `30` |
+| **Max code attempts** | Wrong attempts before the enrollment code is invalidated | `5` |
+| **Show masked email on OTP form** | Show a masked destination on the enrollment verification screen after the code is sent | `false` |
+
+The masked-email toggle is independent of the same-named setting on each Email OTP execution. Enable both if the masked address should appear at login **and** during enrollment.
+
+### Fallback to Email OTP execution config
+
+If no enrollment sending setting is saved on the required action, enrollment falls back to the first `email-authenticator` or `conditional-email-authenticator` execution found in the realm (legacy behaviour). As soon as any sending key is set on the required action, that config is used for the whole enrollment flow (provider, TTL, code length, cooldown, max attempts, simulation mode).
+
+Configure enrollment explicitly on the required action when the realm has more than one Email OTP execution, or when login and enrollment should use different providers or TTLs.
 
 ## What's Next?
 
