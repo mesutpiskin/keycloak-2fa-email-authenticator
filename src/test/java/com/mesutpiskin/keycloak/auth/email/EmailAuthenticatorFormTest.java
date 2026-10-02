@@ -1,5 +1,8 @@
 package com.mesutpiskin.keycloak.auth.email;
 
+import org.keycloak.services.managers.BruteForceProtector;
+import org.keycloak.models.credential.OTPCredentialModel;
+import java.util.Set;
 import jakarta.ws.rs.core.MultivaluedHashMap;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
@@ -301,15 +304,38 @@ class EmailAuthenticatorFormTest {
             when(config.getConfig()).thenReturn(Map.of(EmailConstants.MAX_ATTEMPTS, "5"));
         }
 
-        @Test
-        @DisplayName("Keycloak BFP actif — le compteur de la lib ne doit pas être incrémenté")
-        void testKeycloakBfpActive_doesNotIncrementAttempts() {
+        private BruteForceProtector enableKeycloakBfp() {
             when(realm.isBruteForceProtected()).thenReturn(true);
+            KeycloakSession keycloakSession = mock(KeycloakSession.class);
+            BruteForceProtector protector = mock(BruteForceProtector.class);
+            when(context.getSession()).thenReturn(keycloakSession);
+            when(keycloakSession.getProvider(BruteForceProtector.class)).thenReturn(protector);
+            return protector;
+        }
+
+        @Test
+        @DisplayName("Keycloak BFP active — attempts are counted and the failure is reported as otp")
+        void testKeycloakBfpActive_incrementsAttemptsAndReportsOtpFailure() {
+            BruteForceProtector protector = enableKeycloakBfp();
 
             form.action(context);
 
-            verify(session, never()).setAuthNote(eq("emailCodeAttempts"), anyString());
+            verify(session).setAuthNote("emailCodeAttempts", "1");
+            verify(protector).failedLogin(eq(realm), eq(user), any(), any(), eq(Set.of(OTPCredentialModel.TYPE)));
             verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
+        }
+
+        @Test
+        @DisplayName("Keycloak BFP active — max attempts reached: code is invalidated")
+        void testKeycloakBfpActive_maxAttemptsReached_resetsCode() {
+            enableKeycloakBfp();
+            when(session.getAuthNote("emailCodeAttempts")).thenReturn("4");
+
+            form.action(context);
+
+            verify(session).setAuthNote("emailCodeAttempts", "5");
+            verify(session).removeAuthNote(EmailConstants.CODE);
+            verify(loginForm).setAttribute("maxAttemptsReached", true);
         }
 
         @Test

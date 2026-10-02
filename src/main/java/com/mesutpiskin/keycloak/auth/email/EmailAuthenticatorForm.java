@@ -13,7 +13,9 @@ import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.models.credential.OTPCredentialModel;
 import org.keycloak.models.utils.FormMessage;
+import org.keycloak.services.managers.BruteForceProtector;
 import org.keycloak.services.messages.Messages;
 import org.keycloak.sessions.AuthenticationSessionModel;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
@@ -28,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Keycloak authenticator that implements two-factor authentication via email.
@@ -283,31 +286,38 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
 
         context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
 
+        // Attempts are limited per code in every mode. Previously, with brute force
+        // protection enabled, the code could be guessed without limit because the
+        // failure was not counted by Keycloak and maxAttempts was skipped.
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        int attempts = incrementAttempts(session);
+
         if (context.getRealm().isBruteForceProtected()) {
-            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            // Keycloak only counts failures for the password, otp and recovery-code
+            // categories; this authenticator's own category is ignored. The email code
+            // is a one-time password, so the failure is reported as "otp".
+            BruteForceProtector protector = context.getSession().getProvider(BruteForceProtector.class);
+            protector.failedLogin(context.getRealm(), user, context.getConnection(), context.getUriInfo(),
+                    Set.of(OTPCredentialModel.TYPE));
+        }
+
+        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
+        Map<String, String> configValues = config != null && config.getConfig() != null
+                ? config.getConfig()
+                : Map.of();
+        int maxAttempts = resolvePositiveInt(configValues, EmailConstants.MAX_ATTEMPTS,
+                EmailConstants.DEFAULT_MAX_ATTEMPTS);
+
+        if (attempts >= maxAttempts) {
+            resetEmailCode(context);
+            LoginFormsProvider form = prepareForm(context, null);
+            form.setAttribute("maxAttemptsReached", true);
+            applyFormMessage(form, "email-authenticator-too-many-attempts", EmailConstants.CODE);
+            Response challengeResponse = form.createForm("email-code-form.ftl");
             context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
         } else {
-            AuthenticationSessionModel session = context.getAuthenticationSession();
-            int attempts = incrementAttempts(session);
-
-            AuthenticatorConfigModel config = context.getAuthenticatorConfig();
-            Map<String, String> configValues = config != null && config.getConfig() != null
-                    ? config.getConfig()
-                    : Map.of();
-            int maxAttempts = resolvePositiveInt(configValues, EmailConstants.MAX_ATTEMPTS,
-                    EmailConstants.DEFAULT_MAX_ATTEMPTS);
-
-            if (attempts >= maxAttempts) {
-                resetEmailCode(context);
-                LoginFormsProvider form = prepareForm(context, null);
-                form.setAttribute("maxAttemptsReached", true);
-                applyFormMessage(form, "email-authenticator-too-many-attempts", EmailConstants.CODE);
-                Response challengeResponse = form.createForm("email-code-form.ftl");
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            } else {
-                Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            }
+            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
         }
         return false;
     }
