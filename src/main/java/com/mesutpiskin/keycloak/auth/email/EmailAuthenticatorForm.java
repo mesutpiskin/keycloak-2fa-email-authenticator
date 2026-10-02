@@ -327,45 +327,9 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
         int codeLength = resolvePositiveInt(configValues, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
         form.setAttribute("codeLength", codeLength);
 
-        if (isMaskedEmailVisible(configValues)) {
-            String maskedEmail = maskEmailAddress(context.getUser());
-            if (maskedEmail != null) {
-                form.setAttribute("maskedEmail", maskedEmail);
-            }
-        }
+        EmailMasking.applyToForm(form, context.getUser(), configValues);
 
         return form;
-    }
-
-    private boolean isMaskedEmailVisible(Map<String, String> configValues) {
-        return Boolean.parseBoolean(configValues.getOrDefault(
-                EmailConstants.SHOW_MASKED_EMAIL_ON_OTP_FORM,
-                String.valueOf(EmailConstants.DEFAULT_SHOW_MASKED_EMAIL_ON_OTP_FORM)));
-    }
-
-    private String maskEmailAddress(UserModel user) {
-        if (user == null) {
-            return null;
-        }
-
-        String email = user.getEmail();
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-
-        int atIndex = email.indexOf('@');
-        if (atIndex <= 0 || atIndex == email.length() - 1) {
-            return email;
-        }
-
-        String localPart = email.substring(0, atIndex);
-        String domainPart = email.substring(atIndex);
-
-        if (localPart.length() <= 2) {
-            return localPart.charAt(0) + "***" + domainPart;
-        }
-
-        return localPart.charAt(0) + "***" + localPart.charAt(localPart.length() - 1) + domainPart;
     }
 
     private Long getRemainingSeconds(AuthenticationSessionModel session) {

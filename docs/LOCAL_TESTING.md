@@ -255,6 +255,7 @@ When `false` (the default), only users with a stored email-authenticator credent
 
 **Auto-enrol if email verified:**
 When enabled, the `email-authenticator-setup` required action enrolls users whose email is already verified silently. The credential is created without sending or asking for a setup code, since Keycloak has already proven the user controls the mailbox. Users with an unverified email always go through the normal code-verification flow. Only enable this if you trust how `emailVerified` is set in your realm.
+If you enable **Show Masked Email on OTP Form**, the login form and the enrollment verification form show a server-generated masked value such as `u***e@example.com` after the OTP is sent. This does not rely on `${user.email!}` being available in the Freemarker template context.
 
 ---
 

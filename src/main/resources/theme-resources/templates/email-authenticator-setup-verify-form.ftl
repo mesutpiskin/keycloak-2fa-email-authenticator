@@ -9,7 +9,7 @@
 
             <div class="${properties.kcFormGroupClass!}">
                 <div class="${properties.kcLabelWrapperClass!}">
-                    <label for="emailCode" class="${properties.kcLabelClass!}">${msg("email-authenticator-setup-verify-description", otpLength)}</label>
+                    <label for="emailCode" class="${properties.kcLabelClass!}">${msg("email-authenticator-setup-verify-description", otpLength)}<#if maskedEmail??> <strong>${maskedEmail}</strong></#if></label>
                 </div>
 
             <div class="${properties.kcInputWrapperClass!}">

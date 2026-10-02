@@ -126,7 +126,7 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                         "The maximum number of invalid code attempts before the code is invalidated and a new one must be requested.",
                         ProviderConfigProperty.STRING_TYPE, String.valueOf(EmailConstants.DEFAULT_MAX_ATTEMPTS)),
                 new ProviderConfigProperty(EmailConstants.SHOW_MASKED_EMAIL_ON_OTP_FORM, "Show Masked Email on OTP Form",
-                        "If enabled, displays a masked version of the user's email address on the OTP entry form after the code is sent.",
+                        "If enabled, displays a masked version of the user's email address on the OTP entry form after the code is sent, both at login and during enrolment.",
                         ProviderConfigProperty.BOOLEAN_TYPE, String.valueOf(EmailConstants.DEFAULT_SHOW_MASKED_EMAIL_ON_OTP_FORM)),
                 new ProviderConfigProperty(EmailConstants.SKIP_SETUP, "Treat any user with an email as configured",
                         "When enabled, users with an email address are reported as configured for the email authenticator even if they have never enrolled — useful for admin-provisioned 2FA and for showing the plugin in 'Try Another Way' alternatives. Leave disabled (default) when you rely on 'Conditional - User Configured' sub-flows: the conditional only triggers for users who have actually enrolled.",
