@@ -2,75 +2,38 @@
 
 This document explains how to publish new versions of the Keycloak 2FA Email Authenticator project.
 
-## Prerequisites
+## Release Flow
 
-- Maven must be installed
-- Git must be configured
-- You must have push access to the GitHub repository
+Releases are a two-step, PR-reviewed flow driven by `.github/workflows/release.yml`
+(`Publish packages`):
 
-## Local Release Process
+1. Run the workflow via **Actions → Publish packages → Run workflow**, entering the version to
+   release (e.g. `26.5.1`, no leading `v`, no `-KC` suffix). It bumps `pom.xml` on a
+   `release/v<version>` branch (always cut from `main`) and opens a `Release <version>` PR.
+   Nothing is tagged or published yet.
+2. Review and merge that PR. Merging tags `v<version>`, creates a GitHub Release with
+   auto-generated notes, then builds and publishes the jars for the last 10 Keycloak releases to
+   Maven Central and GitHub Packages, and attaches them to the release.
+3. Verify publication on Maven Central, GitHub Packages and the GitHub Release page.
 
-### Method 1: FULLY AUTOMATED (GitHub CLI) - Easiest! 🚀
+Safety checks: the tag/publish step refuses to run unless `pom.xml` at the merge commit matches
+the version in the `release/v<version>` branch name, so an unrelated branch with that prefix
+cannot trigger a release.
 
-If GitHub CLI is installed and you're logged in, **everything is handled with one command**:
+### Required GitHub Secrets
 
-```bash
-./scripts/release-auto.sh v1.0.0 "Bug fixes and improvements"
-```
+- `CENTRAL_TOKEN_USERNAME`
+- `CENTRAL_TOKEN_PASSWORD`
+- `GPG_SIGNING_KEY`
+- `GPG_SIGNING_KEY_PASSWORD`
 
-The script **automatically**:
-- ✅ Builds JAR with Maven
-- ✅ Creates and pushes git tag
-- ✅ Creates GitHub Release
-- ✅ Uploads JAR file
-- ✅ Adds release notes
-- ✅ Shows download URL
+Optional: `RELEASE_TOKEN` — a PAT with `contents` and `pull-requests` write, used instead of the
+default `GITHUB_TOKEN`. Without it the release PR is opened by `GITHUB_TOKEN`, which cannot
+trigger the `Java CI with Maven` checks on that PR (a GitHub Actions limitation). Only matters if
+`main` requires status checks to merge.
 
-**FIRST TIME SETUP:**
-```bash
-# 1. Login to GitHub CLI (one time only)
-gh auth login
-
-# 2. Now you can release with one command!
-./scripts/release-auto.sh v1.0.0
-```
-
-### Method 2: Semi-Automated (without GitHub CLI)
-
-1. **Run the release script:**
-   ```bash
-   ./scripts/release.sh v1.0.0
-   ```
-   
-   The script does:
-   - ✅ Builds JAR with Maven
-   - ✅ Creates and pushes git tag
-   - ✅ Shows next steps
-
-2. **Create release on GitHub:**
-   - Go to: https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/releases/new
-   - Select the tag you created (e.g., `v1.0.0`)
-   - Upload the JAR file from the `target/` directory
-   - Add release notes
-   - Click "Publish release"
-
-### Method 3: Manual
-
-1. **Build the JAR:**
-   ```bash
-   mvn clean package
-   ```
-
-2. **Create git tag:**
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-
-3. **Manual GitHub release:**
-   - Go to GitHub repo page
-   - `Releases` > `Create new release`
-   - Select tag and upload JAR
+> The `scripts/release*.sh` helpers tag and push directly, bypassing the PR review, and no
+> longer trigger publishing. Use the workflow instead.
 
 ## Version Numbering
 
@@ -100,6 +63,5 @@ Download the JAR and place it in your Keycloak `providers/` directory.
 - [ ] README up to date
 - [ ] Version number correct
 - [ ] CHANGELOG updated (if applicable)
-- [ ] Tag created
-- [ ] JAR uploaded to GitHub
-- [ ] Release notes added
+- [ ] Release PR reviewed and merged (tags, publishes and uploads the JARs automatically)
+- [ ] Release notes checked on the GitHub Release
