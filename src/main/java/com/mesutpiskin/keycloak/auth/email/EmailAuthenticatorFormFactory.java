@@ -130,7 +130,10 @@ public class EmailAuthenticatorFormFactory implements AuthenticatorFactory {
                         ProviderConfigProperty.BOOLEAN_TYPE, String.valueOf(EmailConstants.DEFAULT_SHOW_MASKED_EMAIL_ON_OTP_FORM)),
                 new ProviderConfigProperty(EmailConstants.SKIP_SETUP, "Treat any user with an email as configured",
                         "When enabled, users with an email address are reported as configured for the email authenticator even if they have never enrolled — useful for admin-provisioned 2FA and for showing the plugin in 'Try Another Way' alternatives. Leave disabled (default) when you rely on 'Conditional - User Configured' sub-flows: the conditional only triggers for users who have actually enrolled.",
-                        ProviderConfigProperty.BOOLEAN_TYPE, String.valueOf(EmailConstants.DEFAULT_SKIP_SETUP)));
+                        ProviderConfigProperty.BOOLEAN_TYPE, String.valueOf(EmailConstants.DEFAULT_SKIP_SETUP)),
+                new ProviderConfigProperty(EmailConstants.AUTO_ENROL_IF_EMAIL_VERIFIED, "Auto-enrol users whose email is already verified",
+                        "When enabled, the 'email-authenticator-setup' required action enrols users whose email is already verified silently — the credential is created without sending or asking for a setup code, since Keycloak has already proven the user controls the mailbox. Users with an unverified email still go through the normal code-verification flow. Only enable this if you trust how 'emailVerified' is set in your realm (admin-provisioned accounts, imports or IdP mappers can set it without a real verification).",
+                        ProviderConfigProperty.BOOLEAN_TYPE, String.valueOf(EmailConstants.DEFAULT_AUTO_ENROL_IF_EMAIL_VERIFIED)));
     }
 
     @Override

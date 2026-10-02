@@ -56,14 +56,53 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
 
     @Override
     public void requiredActionChallenge(RequiredActionContext context) {
-        if (userMissingEmail(context.getUser())) {
+        UserModel user = context.getUser();
+        if (userMissingEmail(user)) {
             context.challenge(context.form()
                     .setError("email-authenticator-setup-missing-email")
                     .createForm(SETUP_TEMPLATE));
             return;
         }
 
+        // When the email is already verified, Keycloak has already proven the
+        // user controls the mailbox, so the setup verification code is redundant.
+        // If the admin opted in, enrol silently without sending a code.
+        boolean autoEnrolIfEmailVerified = Boolean.parseBoolean(
+                findAuthenticatorConfig(context).get(EmailConstants.AUTO_ENROL_IF_EMAIL_VERIFIED));
+        if (autoEnrolIfEmailVerified && user.isEmailVerified()) {
+            if (hasExistingCredential(user)) {
+                user.removeRequiredAction(PROVIDER_ID);
+                context.success();
+            } else if (persistCredentialAndComplete(context, user)) {
+                logger.infof("Auto-enrolled user %s for Email 2FA (email already verified, setup code skipped)",
+                        user.getUsername());
+            }
+            return;
+        }
+
         context.challenge(context.form().createForm(SETUP_TEMPLATE));
+    }
+
+    /**
+     * Creates and stores the email-authenticator credential for the user, then
+     * completes the required action. On persistence failure, re-challenges with
+     * the setup form and returns {@code false} so callers can stop early.
+     */
+    private boolean persistCredentialAndComplete(RequiredActionContext context, UserModel user) {
+        EmailAuthenticatorCredentialModel credential = EmailAuthenticatorCredentialModel.create();
+        credential.setUserLabel(user.getEmail());
+        try {
+            user.credentialManager().createStoredCredential(credential);
+        } catch (RuntimeException ex) {
+            logger.errorf(ex, "Failed to persist email authenticator credential for user %s", user.getId());
+            context.challenge(context.form()
+                    .setError("email-authenticator-setup-error")
+                    .createForm(SETUP_TEMPLATE));
+            return false;
+        }
+        user.removeRequiredAction(PROVIDER_ID);
+        context.success();
+        return true;
     }
 
     @Override
@@ -132,18 +171,7 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
         switch (result) {
             case VALID:
                 resetSetupCode(session);
-                EmailAuthenticatorCredentialModel credential = EmailAuthenticatorCredentialModel.create();
-                credential.setUserLabel(user.getEmail());
-                try {
-                    user.credentialManager().createStoredCredential(credential);
-                    user.removeRequiredAction(PROVIDER_ID);
-                    context.success();
-                } catch (RuntimeException ex) {
-                    logger.errorf(ex, "Failed to persist email authenticator credential for user %s", user.getId());
-                    context.challenge(context.form()
-                            .setError("email-authenticator-setup-error")
-                            .createForm(SETUP_TEMPLATE));
-                }
+                persistCredentialAndComplete(context, user);
                 break;
             case EXPIRED:
                 resetSetupCode(session);
