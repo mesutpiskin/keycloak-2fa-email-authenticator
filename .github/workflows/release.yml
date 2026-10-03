@@ -1,0 +1,263 @@
+# Two-step, PR-reviewed release flow. Publishes to Maven Central + GitHub Packages
+# and attaches JARs to the GitHub Release.
+#
+# 1. Run this workflow manually (workflow_dispatch) with the version to release.
+#    It bumps pom.xml on a release/v<version> branch and opens a PR to main.
+#    Nothing is tagged or published yet.
+# 2. Merging that PR tags v<version>, creates the GitHub Release and publishes
+#    the jars for the last 10 Keycloak releases.
+#
+# Requires secrets: CENTRAL_TOKEN_USERNAME, CENTRAL_TOKEN_PASSWORD,
+#                   GPG_SIGNING_KEY, GPG_SIGNING_KEY_PASSWORD
+# Optional secret:  RELEASE_TOKEN (PAT with contents + pull-requests write). PRs
+#                   opened with the default GITHUB_TOKEN do not trigger other
+#                   workflows, so "Java CI with Maven" would not run on the
+#                   release PR; matters only if main requires status checks.
+
+name: Publish packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 26.5.1 (a leading "v" is stripped)'
+        required: true
+        type: string
+
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+
+jobs:
+  prepare:
+    name: Prepare release PR
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    # Two dispatches at once would race for the same branch and version.
+    concurrency:
+      group: ${{ github.workflow }}-prepare
+      cancel-in-progress: false
+
+    steps:
+      # Always main, regardless of the branch selected in the dispatch UI, so a
+      # release PR never carries unrelated commits.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Validate version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${INPUT_VERSION#v}"
+
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$INPUT_VERSION' is not a valid version (expected e.g. 26.5.1)."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists — pick a new version."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --heads origin "refs/heads/release/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Branch release/v$VERSION already exists — a release for this version is already in flight."
+            exit 1
+          fi
+
+          CURRENT=$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)
+          if [ "$VERSION" = "$CURRENT" ]; then
+            echo "::error::The pom is already at $VERSION — nothing to bump."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "branch=release/v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Main's pom carries the base version only (no -KC suffix): each matrix
+      # publish job below sets its own -KC<keycloak-version> at deploy time.
+      - name: Set pom version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: mvn -B -q versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+
+      - name: Open release pull request
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git switch -c "$BRANCH"
+          git add pom.xml
+          git commit -m "chore(release): bump version to $VERSION"
+          git push origin "$BRANCH"
+
+          URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Release $VERSION" \
+            --body "Merging this PR tags \`v$VERSION\`, publishes a GitHub Release with auto-generated notes, and builds+publishes the jars for the last 10 Keycloak releases to Maven Central and GitHub Packages.")
+
+          {
+            echo "### Release $VERSION prepared"
+            echo
+            echo "Review and merge $URL to tag and publish."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tag-release:
+    name: Tag and create GitHub release
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      # The branch name alone isn't proof this PR came from the prepare job.
+      # Requiring the merged pom.xml to be at the version the branch name
+      # claims guards against a coincidentally-named branch.
+      - name: Verify this is a real release PR
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          EXPECTED="${HEAD_REF#release/v}"
+          ACTUAL=$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)
+
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Branch '$HEAD_REF' claims version $EXPECTED but pom.xml at the merge commit is $ACTUAL — refusing to tag/publish."
+            exit 1
+          fi
+
+      # gh release create tags at --target itself, so there is no separate
+      # tag push to keep in sync with the release.
+      - name: Create tag and GitHub release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+
+          TAG="${HEAD_REF#release/}"
+          VERSION="${TAG#v}"
+
+          gh release create "$TAG" --target "$SHA" --title "$TAG" --generate-notes
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          echo "Released $TAG." >> "$GITHUB_STEP_SUMMARY"
+
+  kc-version-matrix:
+    name: Get last 10 Keycloak versions
+    needs: tag-release
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          VERSIONS=$( curl -L -s https://api.github.com/repos/keycloak/keycloak/releases \
+            | jq -c '[.[] | select(.prerelease == false and .draft == false)] | sort_by(.name)[-10:] | [ .[] | .version=.name | {version}]' )
+          echo "matrix={\"include\":$VERSIONS}" >> $GITHUB_OUTPUT
+
+  build:
+    name: Publish for Keycloak ${{ matrix.version }}
+    needs: [tag-release, kc-version-matrix]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.kc-version-matrix.outputs.matrix)}}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag-release.outputs.tag }}
+          fetch-depth: 0
+      - name: Set up Maven Central Repository
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Add GitHub Packages server to Maven settings
+        run: |
+          sed -i 's|</servers>|<server><id>github</id><username>${env.GITHUB_ACTOR}</username><password>${env.GITHUB_TOKEN}</password></server></servers>|' ~/.m2/settings.xml
+      - name: Set version corresponding to Keycloak version
+        env:
+          VERSION: ${{ needs.tag-release.outputs.version }}
+          KC_VERSION: ${{ matrix.version }}
+        run: mvn -B versions:set -DnewVersion="${VERSION}-KC${KC_VERSION}"
+      - name: Build and publish to Maven Central
+        run: |
+          set +e
+          output=$(mvn -Dkeycloak.version="$KC_VERSION" -B deploy --file pom.xml -P release --batch-mode 2>&1)
+          mvn_exit=$?
+          set -e
+          echo "$output"
+          if echo "$output" | grep -q "already exists"; then
+            echo "Version already exists on Maven Central — skipping."
+            exit 0
+          fi
+          exit $mvn_exit
+        env:
+          KC_VERSION: ${{ matrix.version }}
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_SIGNING_KEY_PASSWORD }}
+      - name: Publish to GitHub Packages
+        run: mvn deploy -P github -DskipTests -Dgpg.skip=true --batch-mode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attach artifact to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.tag-release.outputs.tag }}
+          files: target/keycloak-2fa-email-authenticator*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
