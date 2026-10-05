@@ -3,6 +3,7 @@ package com.mesutpiskin.keycloak.auth.email;
 import java.lang.reflect.Method;
 import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.jboss.logging.Logger;
@@ -12,6 +13,7 @@ import org.keycloak.authentication.RequiredActionContext;
 import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.common.util.SecretGenerator;
 import org.keycloak.email.EmailException;
+import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
@@ -49,9 +51,9 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
     public void evaluateTriggers(RequiredActionContext context) {
         // No automatic trigger. Enrolment is voluntary via the account console;
         // admins who want to force enrolment can add the
-        // 'email-authenticator-setup' required action manually, or set
-        // skipSetup=true on the email-authenticator execution to bypass
-        // enrolment entirely for users with an email address.
+        // 'email-authenticator-setup' required action manually, or use the
+        // 'Email OTP (No Enrollment)' authenticator to skip enrolment entirely
+        // for users with an email address.
     }
 
     @Override
@@ -289,13 +291,27 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
         }
     }
 
-    private Map<String, String> findAuthenticatorConfig(RequiredActionContext context) {
+    /**
+     * Finds the Email OTP configuration enrolment uses (email provider, OTP
+     * policy, auto-enrol). Executions users enrol for are preferred, because only
+     * their configuration carries the enrolment settings. A no-enrollment
+     * execution is used only when the realm has no other, so its email provider
+     * settings still apply, for example after {@link SkipSetupMigration} has
+     * switched the realm's only Email OTP execution.
+     */
+    // Package-private for tests.
+    Map<String, String> findAuthenticatorConfig(RequiredActionContext context) {
         RealmModel realm = context.getRealm();
 
-        return realm.getAuthenticationFlowsStream()
+        List<AuthenticationExecutionModel> executions = realm.getAuthenticationFlowsStream()
                 .flatMap(flow -> realm.getAuthenticationExecutionsStream(flow.getId()))
-                .filter(exec -> EmailAuthenticatorFormFactory.PROVIDER_ID.equals(exec.getAuthenticator())
-                        || ConditionalEmailAuthenticatorFormFactory.PROVIDER_ID.equals(exec.getAuthenticator()))
+                .filter(exec -> AbstractEmailAuthenticatorFormFactory.isEmailAuthenticator(exec.getAuthenticator()))
+                .toList();
+
+        return executions.stream()
+                .filter(exec -> AbstractEmailAuthenticatorFormFactory.isEnrolmentCapable(exec.getAuthenticator()))
+                .findFirst()
+                .or(() -> executions.stream().findFirst())
                 .map(exec -> {
                     String configId = exec.getAuthenticatorConfig();
                     if (configId != null) {
@@ -306,7 +322,6 @@ public class EmailAuthenticatorRequiredAction implements RequiredActionProvider,
                     }
                     return Map.<String, String>of();
                 })
-                .findFirst()
                 .orElse(Map.of());
     }
 

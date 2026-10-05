@@ -244,14 +244,13 @@ Click the **⚙️ (Settings)** icon on the "Email OTP" row:
 | **Resend cooldown** | `30` | Seconds before user can request a new code |
 | **Max code attempts** | `5` | Wrong attempts before code is invalidated |
 | **Show Masked Email on OTP Form** | `false` | Display a masked email (e.g. `u***e@example.com`) on the OTP screen |
-| **Skip setup** | `false` | Treat any user with an email as configured, even without enrollment |
 | **Auto-enrol if email verified** | `false` | Silently enroll users whose email is already verified, skipping the setup code |
 
 **Show Masked Email on OTP Form:**
 If you enable this, the login form shows a server-generated masked value such as `u***e@example.com` after the OTP is sent. This does not rely on `${user.email!}` being available in the Freemarker template context.
 
-**Skip setup:**
-When `false` (the default), only users with a stored email-authenticator credential are reported as configured. This matches Keycloak's convention for built-in authenticators and ensures "Conditional - User Configured" sub-flows behave as expected. Set to `true` to allow any user with an email address to use email OTP without prior enrollment — useful for admin-provisioned accounts and for showing the plugin in Keycloak's "Try Another Way" alternative list.
+**Enrollment vs. no enrollment:**
+The **Email OTP** execution only asks users who have **enrolled** the email authenticator. This matches Keycloak's convention for built-in authenticators, so "Conditional - User Configured" sub-flows and "Try Another Way" only include enrolled users. To test OTP for every user with an email address and no enrollment, add the **Email OTP (No Enrollment)** execution instead. It is also listed under "Try Another Way" for users who never enrolled. It replaces the former **Skip setup** option. Because that option applied to the whole realm, every Email OTP execution in a realm where it was enabled is migrated automatically on startup (look for `SkipSetupMigration` in the server log). Note that a REQUIRED no-enrollment step blocks users without an email address, where Skip setup let them through without an OTP.
 
 **Auto-enrol if email verified:**
 When enabled, the `email-authenticator-setup` required action enrolls users whose email is already verified silently. The credential is created without sending or asking for a setup code, since Keycloak has already proven the user controls the mailbox. Users with an unverified email always go through the normal code-verification flow. Only enable this if you trust how `emailVerified` is set in your realm.

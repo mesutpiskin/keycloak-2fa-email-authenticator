@@ -50,7 +50,17 @@ Inside the copied flow, locate the **"Browser with Email OTP Forms - Conditional
 
 ![Add execution button inside the Forms sub-flow](/img/screenshots/auth-flow-add-execution.png)
 
-Choose your execution type depending on whether you want OTP for all users or only some:
+Choose your execution type depending on who should get the OTP step:
+
+| Execution | Who is asked for a code | Shown under "Try Another Way" | "Condition - User Configured" |
+|-----------|-------------------------|-------------------------------|-------------------------------|
+| **Email OTP** | Users who have **enrolled** the email authenticator | Only to enrolled users | True only for enrolled users |
+| **Email OTP (No Enrollment)** | **Every user with an email address**, no enrollment | To every user, including those who never enrolled | True for every user with an email |
+| **Conditional Email OTP** | Enrolled users, filtered by role / attribute / header | Only to enrolled users | True only for enrolled users |
+
+:::info Why two "Email OTP" executions?
+Keycloak decides whether an authenticator is tied to a stored credential from its type, not from its settings. A credential-based authenticator is only offered under "Try Another Way" to users who already have that credential. **Email OTP** follows Keycloak's convention for built-in second factors. **Email OTP (No Enrollment)** is the variant for realms where having an email address is enough.
+:::
 
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
@@ -77,6 +87,19 @@ import TabItem from "@theme/TabItem";
 
 :::tip
 Use **REQUIRED** for the strictest security. Use **ALTERNATIVE** only if you have other authenticators in the same flow that can substitute for OTP.
+:::
+
+  </TabItem>
+  <TabItem value="email-otp-no-enrollment" label="Email OTP (No Enrollment)">
+
+**Use this when:** every user with an email address should be able to receive an OTP without enrolling first. Examples: admin-provisioned accounts, or offering email OTP under "Try Another Way" next to OTP or WebAuthn.
+
+3. Search for and select **"Email OTP (No Enrollment)"**
+4. Click **"Add"**
+5. Set the requirement as described in the **Email OTP** tab
+
+:::caution
+Keycloak lists non-credential authenticators under "Try Another Way" for **every** user. A user without an email address will also see the option, and choosing it shows Keycloak's "credential setup required" error. Make sure users have an email address, or use **Email OTP** with enrollment.
 :::
 
   </TabItem>
@@ -156,7 +179,7 @@ Click the **⚙️ Settings** icon on the **"Email OTP"** row to open the authen
 | **Resend cooldown** | Seconds a user must wait before requesting a new code | `30` | `60` |
 | **Max code attempts** | Wrong attempts allowed before the code is invalidated | `5` | `3` |
 | **Show masked email on OTP form** | Show a masked version of the destination email on the OTP login and enrollment screens | `false` | `true` |
-| **Skip setup** | Skip enrollment for users who already have an email address | `true` | `true` |
+| **Auto-enrol users whose email is already verified** | Enrol users with a verified email without sending a setup code (**Email OTP** and **Conditional Email OTP** only) | `false` | depends on how `emailVerified` is set in your realm |
 
 ### Setting details
 
@@ -191,10 +214,24 @@ This applies both to the OTP login form and to the verification step of enrollme
 
 This setting is intentionally implemented server-side. It does **not** depend on `${user.email!}` being present in the FreeMarker login template context.
 
-#### Skip setup
-When `true`, users who already have an email address on their Keycloak account skip the enrollment required action and go straight to the OTP prompt. This is the recommended setting when an admin has enforced 2FA for existing users — they are not forced through a setup wizard on their next login.
+#### Upgrading from "Skip setup"
+Earlier releases had a **Skip setup** option ("Treat any user with an email as configured"). It has been replaced by the **Email OTP (No Enrollment)** execution, because a setting cannot change how Keycloak lists an authenticator under "Try Another Way".
 
-When `false`, every user must explicitly enroll before they can use email OTP, even if they already have an email on their account.
+On first startup after the upgrade, the extension migrates existing realms automatically:
+
+- Skip setup applied to the **whole realm**: enabling it on any Email OTP or Conditional Email OTP execution affected every one of them. So if it was enabled anywhere in a realm, **every Email OTP execution in that realm** is switched to **Email OTP (No Enrollment)**, keeping its other settings. Users who never enrolled still get a code.
+- **Conditional Email OTP** executions in such a realm cannot be switched. The server log shows a `WARN` naming the realm and flow, **only on that first startup**. From now on, these executions only ask enrolled users for a code. Ask the remaining users to enroll, or redesign the flow around **Email OTP (No Enrollment)**.
+- The obsolete setting is removed from every Email OTP configuration.
+
+:::warning Behaviour change for users without an email address
+Previously, a REQUIRED Email OTP step with Skip setup enabled let users **without an email address** log in without any OTP. A REQUIRED **Email OTP (No Enrollment)** step blocks them instead, with Keycloak's "credential setup required" error. Make sure every user who goes through that step has an email address.
+:::
+
+Check the server log after upgrading:
+
+```bash
+docker logs keycloak | grep SkipSetupMigration
+```
 
 ## What's Next?
 

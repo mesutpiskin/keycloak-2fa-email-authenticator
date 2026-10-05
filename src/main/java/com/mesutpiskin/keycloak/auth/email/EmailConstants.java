@@ -202,34 +202,6 @@ public final class EmailConstants {
 	public static final boolean DEFAULT_SHOW_MASKED_EMAIL_ON_OTP_FORM = false;
 
 	/**
-	 * Configuration key controlling whether users with an email address but no
-	 * stored email-authenticator credential are reported as configured by
-	 * {@link com.mesutpiskin.keycloak.auth.email.EmailAuthenticatorForm#configuredFor}.
-	 * <p>
-	 * When {@code true}, any user with an email is eligible to receive an OTP
-	 * without prior enrolment — useful for admin-provisioned accounts (#112) and
-	 * for showing the plugin in Keycloak's "Try Another Way" alternative list
-	 * (#50).
-	 * </p>
-	 * <p>
-	 * When {@code false} (the default), only users with a stored credential are
-	 * reported as configured, matching Keycloak's convention for built-in
-	 * authenticators. This is the setting "Conditional - User Configured"
-	 * sub-flows expect, so non-enrolled users are not unexpectedly prompted for
-	 * an email OTP (#108 follow-up).
-	 * </p>
-	 */
-	public static final String SKIP_SETUP = "skipSetup";
-
-	/**
-	 * Default value for {@link #SKIP_SETUP}. {@code false} is the strict,
-	 * convention-aligned default so conditional sub-flows behave as admins
-	 * expect; opt in to the permissive behaviour by setting the flag to
-	 * {@code true} on the email-authenticator execution.
-	 */
-	public static final boolean DEFAULT_SKIP_SETUP = false;
-
-	/**
 	 * Configuration key controlling whether the enrolment (required action)
 	 * auto-enrols users whose email address is already verified
 	 * ({@link org.keycloak.models.UserModel#isEmailVerified()}), skipping the

@@ -53,6 +53,13 @@ docker restart keycloak
 
 4. **ALTERNATIVE requirement satisfied by another factor** — if another step already satisfies the flow, the OTP step is skipped. Switch the Email OTP requirement to REQUIRED.
 
+### Email OTP does not appear under "Try Another Way"
+
+The **Email OTP** execution is credential-based. Like Keycloak's built-in OTP and WebAuthn, Keycloak only offers it as an alternative to users who have **enrolled** the email authenticator.
+
+- To offer it to users who never enrolled, use the **Email OTP (No Enrollment)** execution instead. See [Add the OTP Execution](./configuration/authentication-flow#b-add-the-otp-execution).
+- To keep enrollment, have users enroll from the account console, or assign them the `email-authenticator-setup` required action.
+
 ---
 
 ## Build errors
