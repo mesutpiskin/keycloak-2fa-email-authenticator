@@ -1,435 +1,59 @@
 package com.mesutpiskin.keycloak.auth.email;
 
-import org.keycloak.authentication.AuthenticationFlowContext;
-import org.keycloak.authentication.AuthenticationFlowError;
-import org.keycloak.authentication.AuthenticationFlowException;
 import org.keycloak.authentication.CredentialValidator;
 import org.keycloak.authentication.RequiredActionFactory;
 import org.keycloak.authentication.RequiredActionProvider;
-import org.keycloak.email.EmailException;
-import org.keycloak.events.Errors;
-import org.keycloak.forms.login.LoginFormsProvider;
-import org.keycloak.models.AuthenticatorConfigModel;
+import org.keycloak.credential.CredentialProvider;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.UserModel;
-import org.keycloak.models.utils.FormMessage;
-import org.keycloak.services.messages.Messages;
-import org.keycloak.sessions.AuthenticationSessionModel;
-import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
-import org.keycloak.common.util.SecretGenerator;
-import org.keycloak.credential.CredentialProvider;
-
-import org.jboss.logging.Logger;
-import jakarta.ws.rs.core.MultivaluedMap;
-import jakarta.ws.rs.core.Response;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Keycloak authenticator that implements two-factor authentication via email.
+ * Credential-based email OTP authenticator ({@code email-authenticator}): a
+ * user is eligible only after enrolling an {@code email-authenticator}
+ * credential.
  * <p>
- * This authenticator generates a one-time password (OTP) and sends it to the
- * user's
- * registered email address. The user must enter the received code to complete
- * authentication.
+ * This follows Keycloak's convention for built-in second factors such as OTP and
+ * WebAuthn:
  * </p>
- * <p>
- * Features include:
  * <ul>
- * <li>Configurable code length and TTL (time-to-live)</li>
- * <li>Resend cooldown to prevent spam</li>
- * <li>Simulation mode for testing without sending actual emails</li>
- * <li>Brute force protection support</li>
- * <li>Code expiration handling</li>
+ * <li>"Condition - User Configured" only fires for users who have actually
+ * enrolled.</li>
+ * <li>Because it implements {@link CredentialValidator}, Keycloak lists it
+ * under "Try Another Way" only for users with a stored credential, ordered by
+ * the user's credential priority.</li>
+ * <li>The account console offers enrolment through
+ * {@link EmailAuthenticatorRequiredAction}.</li>
  * </ul>
+ * <p>
+ * To offer email OTP to every user with an email address without enrolment,
+ * use {@link NoEnrollmentEmailAuthenticatorForm} instead.
  * </p>
  *
  * @author Mesut Pişkin
  * @version 26.1.1
  * @since 1.0.0
+ * @see AbstractEmailAuthenticatorForm
  */
-public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
+public class EmailAuthenticatorForm extends AbstractEmailAuthenticatorForm
         implements CredentialValidator<EmailAuthenticatorCredentialProvider> {
 
-    protected static final Logger logger = Logger.getLogger(EmailAuthenticatorForm.class);
-    private static final String CODE_ATTEMPTS = "emailCodeAttempts";
-
     /**
-     * Initiates the authentication process by presenting the email OTP challenge to
-     * the user.
-     * <p>
-     * This method is called by Keycloak when the user reaches this authenticator in
-     * the flow.
-     * It generates and sends an email code, then displays the form for code entry.
-     * </p>
-     *
-     * @param context the authentication flow context containing user, session, and
-     *                realm information
-     */
-    @Override
-    public void authenticate(AuthenticationFlowContext context) {
-        context.challenge(challenge(context, null));
-    }
-
-    /**
-     * Creates the authentication challenge response with the email code entry form.
-     * <p>
-     * Generates and sends the email code if not already sent, prepares the form
-     * with
-     * any error messages, and returns the rendered form response.
-     * </p>
-     *
-     * @param context the authentication flow context
-     * @param error   optional error message key to display
-     * @param field   optional field name associated with the error
-     * @return the HTTP response containing the rendered form
-     */
-    @Override
-    protected Response challenge(AuthenticationFlowContext context, String error, String field) {
-        generateAndSendEmailCode(context);
-        LoginFormsProvider form = prepareForm(context, null);
-        applyFormMessage(form, error, field);
-        return form.createForm("email-code-form.ftl");
-    }
-
-    /**
-     * Generates a random email code and sends it to the user's registered email
-     * address.
-     * <p>
-     * If a code has already been generated for this session, this method returns
-     * early
-     * to prevent duplicate emails. The code is stored in the authentication session
-     * along
-     * with its expiration time and resend cooldown period.
-     * </p>
-     * <p>
-     * In simulation mode, the code is logged instead of being emailed, useful for
-     * development.
-     * </p>
-     *
-     * @param context the authentication flow context
-     */
-    private void generateAndSendEmailCode(AuthenticationFlowContext context) {
-        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
-        AuthenticationSessionModel session = context.getAuthenticationSession();
-
-        if (session.getAuthNote(EmailConstants.CODE) != null) {
-            // skip sending email code
-            return;
-        }
-
-        Map<String, String> configValues = config != null && config.getConfig() != null
-                ? config.getConfig()
-                : Map.of();
-
-        int length = resolvePositiveInt(configValues, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
-        int ttl = resolvePositiveInt(configValues, EmailConstants.CODE_TTL, EmailConstants.DEFAULT_TTL);
-        int resendCooldown = resolvePositiveInt(configValues, EmailConstants.RESEND_COOLDOWN,
-                EmailConstants.DEFAULT_RESEND_COOLDOWN);
-
-        String code = SecretGenerator.getInstance().randomString(length, SecretGenerator.DIGITS);
-        if (config != null && Boolean.parseBoolean(config.getConfig().get(EmailConstants.SIMULATION_MODE))) {
-            logger.infof("***** SIMULATION MODE ***** Email code send to %s for user %s is: %s",
-                    context.getUser().getEmail(), context.getUser().getUsername(), code);
-        } else {
-            sendEmailWithCode(context, code, ttl);
-        }
-
-        session.setAuthNote(EmailConstants.CODE, OtpHashUtils.hash(code));
-        long now = System.currentTimeMillis();
-        session.setAuthNote(EmailConstants.CODE_TTL, Long.toString(now + (ttl * 1000L)));
-        session.setAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER, Long.toString(now + (resendCooldown * 1000L)));
-    }
-
-    /**
-     * Resolves a positive integer configuration value with validation and fallback.
-     * <p>
-     * Parses the configuration value for the given key. If the value is missing,
-     * blank,
-     * not a valid integer, or non-positive, returns the default value and logs a
-     * warning.
-     * </p>
-     *
-     * @param configValues the configuration map
-     * @param key          the configuration key to resolve
-     * @param defaultValue the fallback value if parsing fails or value is invalid
-     * @return the parsed positive integer or the default value
-     */
-    private int resolvePositiveInt(Map<String, String> configValues, String key, int defaultValue) {
-        String raw = configValues.get(key);
-        if (raw == null || raw.isBlank()) {
-            return defaultValue;
-        }
-        try {
-            int parsed = Integer.parseInt(raw.trim());
-            if (parsed <= 0) {
-                logger.warnf("Configuration value for %s was non-positive ('%s'); falling back to default %d", key, raw,
-                        defaultValue);
-                return defaultValue;
-            }
-            return parsed;
-        } catch (NumberFormatException ex) {
-            logger.warnf("Configuration value for %s was invalid ('%s'); falling back to default %d", key, raw,
-                    defaultValue);
-            return defaultValue;
-        }
-    }
-
-    /**
-     * Processes the form submission when the user enters the email code.
-     * <p>
-     * Validates the submitted code against the stored code, checking for expiration
-     * and correctness. Handles special form actions like "resend" and "cancel".
-     * On successful validation, marks the authentication as successful.
-     * </p>
-     *
-     * @param context the authentication flow context
-     */
-    @Override
-    public void action(AuthenticationFlowContext context) {
-        UserModel userModel = context.getUser();
-        if (!enabledUser(context, userModel)) {
-            // error in context is set in enabledUser/isDisabledByBruteForce
-            return;
-        }
-
-        MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
-        if (handleFormShortcuts(context, formData)) {
-            return;
-        }
-
-        if (isValidCodeContext(context, userModel, formData)) {
-            resetEmailCode(context);
-            context.success();
-        }
-    }
-
-    private boolean handleFormShortcuts(AuthenticationFlowContext context, MultivaluedMap<String, String> formData) {
-        if (formData.containsKey("resend")) {
-            AuthenticationSessionModel session = context.getAuthenticationSession();
-            Long remainingSeconds = getRemainingSeconds(session);
-            if (remainingSeconds != null && remainingSeconds > 0L) {
-                LoginFormsProvider form = prepareForm(context, remainingSeconds);
-                applyFormMessage(form, "email-authenticator-resend-cooldown", null, remainingSeconds);
-                context.challenge(form.createForm("email-code-form.ftl"));
-                return true;
-            }
-
-            resetEmailCode(context);
-            context.challenge(challenge(context, null));
-            return true;
-        }
-
-        if (formData.containsKey("cancel")) {
-            resetEmailCode(context);
-            context.resetFlow();
-            return true;
-        }
-
-        return false;
-    }
-
-    private record CodeContext(String storedCode, Long expiresAt, String submittedCode) {
-    }
-
-    private CodeContext buildCodeContext(AuthenticationSessionModel session, MultivaluedMap<String, String> formData) {
-        String storedCode = session.getAuthNote(EmailConstants.CODE);
-        String ttlNote = session.getAuthNote(EmailConstants.CODE_TTL);
-        Long expiresAt = null;
-        if (ttlNote != null) {
-            try {
-                expiresAt = Long.parseLong(ttlNote);
-            } catch (NumberFormatException ex) {
-                logger.warnf("Invalid TTL value '%s' found for email authenticator; treating as expired", ttlNote);
-            }
-        }
-
-        String submittedRaw = formData.getFirst(EmailConstants.CODE);
-        String submittedCode = submittedRaw == null ? null : submittedRaw.strip();
-
-        return new CodeContext(storedCode, expiresAt, submittedCode);
-    }
-
-    private boolean isValidCodeContext(AuthenticationFlowContext context, UserModel user,
-            MultivaluedMap<String, String> formData) {
-        CodeContext codeContext = buildCodeContext(context.getAuthenticationSession(), formData);
-        if (codeContext.storedCode() == null || codeContext.expiresAt() == null) {
-            context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
-            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            return false;
-        }
-
-        if (codeContext.submittedCode() == null || codeContext.submittedCode().isEmpty()) {
-            context.challenge(challenge(context, Messages.MISSING_TOTP, EmailConstants.CODE));
-            return false;
-        }
-
-        if (codeContext.expiresAt() < System.currentTimeMillis()) {
-            context.getEvent().user(user).error(Errors.EXPIRED_CODE);
-            Response challengeResponse = challenge(context, Messages.EXPIRED_ACTION_TOKEN_SESSION_EXISTS,
-                    EmailConstants.CODE);
-            context.failureChallenge(AuthenticationFlowError.EXPIRED_CODE, challengeResponse);
-            return false;
-        }
-
-        if (OtpHashUtils.matches(codeContext.submittedCode(), codeContext.storedCode())) {
-            return true;
-        }
-
-        context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
-
-        if (context.getRealm().isBruteForceProtected()) {
-            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-        } else {
-            AuthenticationSessionModel session = context.getAuthenticationSession();
-            int attempts = incrementAttempts(session);
-
-            AuthenticatorConfigModel config = context.getAuthenticatorConfig();
-            Map<String, String> configValues = config != null && config.getConfig() != null
-                    ? config.getConfig()
-                    : Map.of();
-            int maxAttempts = resolvePositiveInt(configValues, EmailConstants.MAX_ATTEMPTS,
-                    EmailConstants.DEFAULT_MAX_ATTEMPTS);
-
-            if (attempts >= maxAttempts) {
-                resetEmailCode(context);
-                LoginFormsProvider form = prepareForm(context, null);
-                form.setAttribute("maxAttemptsReached", true);
-                applyFormMessage(form, "email-authenticator-too-many-attempts", EmailConstants.CODE);
-                Response challengeResponse = form.createForm("email-code-form.ftl");
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            } else {
-                Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            }
-        }
-        return false;
-    }
-
-    private LoginFormsProvider prepareForm(AuthenticationFlowContext context, Long remainingSeconds) {
-        AuthenticationSessionModel session = context.getAuthenticationSession();
-        LoginFormsProvider form = context.form().setExecution(context.getExecution().getId());
-        Long secondsToExpose = remainingSeconds != null ? remainingSeconds : getRemainingSeconds(session);
-        if (secondsToExpose != null && secondsToExpose > 0L) {
-            form.setAttribute("resendAvailableInSeconds", secondsToExpose);
-        }
-
-        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
-        Map<String, String> configValues = config != null && config.getConfig() != null
-                ? config.getConfig()
-                : Map.of();
-        int codeLength = resolvePositiveInt(configValues, EmailConstants.CODE_LENGTH, EmailConstants.DEFAULT_LENGTH);
-        form.setAttribute("codeLength", codeLength);
-
-        EmailMasking.applyToForm(form, context.getUser(), configValues);
-
-        return form;
-    }
-
-    private Long getRemainingSeconds(AuthenticationSessionModel session) {
-        String rawResendAfter = session.getAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
-        if (rawResendAfter == null) {
-            return null;
-        }
-        Long resendAt = null;
-        try {
-            resendAt = Long.parseLong(rawResendAfter);
-        } catch (NumberFormatException ex) {
-            logger.warnf("Invalid resend availability timestamp '%s' for email authenticator; allowing resend",
-                    rawResendAfter);
-            session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
-            return null;
-        }
-        long remainingMillis = resendAt - System.currentTimeMillis();
-        return Math.max(0L, (remainingMillis + EmailConstants.MILLIS_ROUNDING_OFFSET) / 1000L);
-    }
-
-    private void applyFormMessage(LoginFormsProvider form, String messageKey, String field, Object... messageParams) {
-        if (messageKey == null) {
-            return;
-        }
-        if (field != null) {
-            form.addError(new FormMessage(field, messageKey, messageParams));
-        } else {
-            form.setError(messageKey, messageParams);
-        }
-    }
-
-    protected String disabledByBruteForceError() {
-        return Messages.INVALID_ACCESS_CODE;
-    }
-
-    private void resetEmailCode(AuthenticationFlowContext context) {
-        AuthenticationSessionModel session = context.getAuthenticationSession();
-        session.removeAuthNote(EmailConstants.CODE);
-        session.removeAuthNote(EmailConstants.CODE_TTL);
-        session.removeAuthNote(EmailConstants.CODE_RESEND_AVAILABLE_AFTER);
-        session.removeAuthNote(CODE_ATTEMPTS);
-    }
-
-    private int incrementAttempts(AuthenticationSessionModel session) {
-        String raw = session.getAuthNote(CODE_ATTEMPTS);
-        int attempts = 1;
-        if (raw != null) {
-            try {
-                attempts = Integer.parseInt(raw) + 1;
-            } catch (NumberFormatException ignored) {
-                // corrupt value, start over
-            }
-        }
-        session.setAuthNote(CODE_ATTEMPTS, Integer.toString(attempts));
-        return attempts;
-    }
-
-    @Override
-    public boolean requiresUser() {
-        return true;
-    }
-
-    /**
-     * Eligibility rules for the email authenticator:
-     * <ol>
-     * <li>A user with a stored email-authenticator credential is always
-     * configured.</li>
-     * <li>A user without an email address is never configured — the
-     * authenticator has nowhere to send the OTP.</li>
-     * <li>Otherwise, the user is reported as configured only when an admin has
-     * explicitly opted in to the "any user with email is eligible" behaviour by
-     * setting {@link EmailConstants#SKIP_SETUP skipSetup} = {@code true} on at
-     * least one email-authenticator execution in the realm.</li>
-     * </ol>
-     * The default ({@code skipSetup=false}) is intentional: it matches the
-     * Keycloak convention that {@code configuredFor=true} means "the user has
-     * enrolled this credential", so "Conditional - User Configured" sub-flows
-     * are not triggered for users who have neither enrolled nor been explicitly
-     * targeted by the admin's flow design.
+     * A user is configured when they have an email address <em>and</em> a stored
+     * {@link EmailAuthenticatorCredentialModel#TYPE_ID email-authenticator}
+     * credential.
      */
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        if (user == null) {
-            return false;
-        }
-
-        String email = user.getEmail();
-        if (email == null || email.isBlank()) {
-            return false;
-        }
-
-        if (hasStoredEmailCredential(user)) {
-            return true;
-        }
-
-        return isSkipSetupEnabledForRealm(realm);
+        return hasEmail(user) && hasStoredEmailCredential(user);
     }
 
-    private boolean hasStoredEmailCredential(UserModel user) {
-        var credentialManager = user.credentialManager();
+    private static boolean hasStoredEmailCredential(UserModel user) {
+        SubjectCredentialManager credentialManager = user.credentialManager();
         if (credentialManager == null) {
             return false;
         }
@@ -439,40 +63,6 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
                 .isPresent();
     }
 
-    /**
-     * Looks up the {@code skipSetup} flag on any email-authenticator (regular or
-     * conditional) execution in the realm. A single explicit {@code true} opts
-     * the realm into the permissive eligibility model; otherwise the strict
-     * default applies. This scan is intentionally kept in the form authenticator
-     * (not the credential provider) so the provider keeps the clean contract
-     * introduced for issue #129 (stored credentials only).
-     */
-    private boolean isSkipSetupEnabledForRealm(RealmModel realm) {
-        if (realm == null) {
-            return EmailConstants.DEFAULT_SKIP_SETUP;
-        }
-        return realm.getAuthenticationFlowsStream()
-                .flatMap(flow -> realm.getAuthenticationExecutionsStream(flow.getId()))
-                .filter(exec -> EmailAuthenticatorFormFactory.PROVIDER_ID.equals(exec.getAuthenticator())
-                        || ConditionalEmailAuthenticatorFormFactory.PROVIDER_ID.equals(exec.getAuthenticator()))
-                .map(exec -> {
-                    String configId = exec.getAuthenticatorConfig();
-                    if (configId == null) {
-                        return null;
-                    }
-                    AuthenticatorConfigModel cfg = realm.getAuthenticatorConfigById(configId);
-                    if (cfg == null || cfg.getConfig() == null) {
-                        return null;
-                    }
-                    return cfg.getConfig().get(EmailConstants.SKIP_SETUP);
-                })
-                .filter(value -> value != null && !value.isBlank())
-                .map(value -> Boolean.parseBoolean(value.trim()))
-                .filter(Boolean::booleanValue)
-                .findAny()
-                .orElse(EmailConstants.DEFAULT_SKIP_SETUP);
-    }
-
     @Override
     public EmailAuthenticatorCredentialProvider getCredentialProvider(KeycloakSession session) {
         return (EmailAuthenticatorCredentialProvider) session.getProvider(CredentialProvider.class,
@@ -480,106 +70,13 @@ public class EmailAuthenticatorForm extends AbstractUsernameFormAuthenticator
     }
 
     /**
-     * No automatic required action is registered. Voluntary enrolment remains
-     * available via {@link EmailAuthenticatorRequiredAction} (account console).
-     * Admins who want to force enrolment for non-configured users can either
-     * add the 'email-authenticator-setup' required action manually, or set
-     * {@link EmailConstants#SKIP_SETUP skipSetup}={@code true} on the
-     * authenticator execution so users with an email are considered configured
-     * without enrolment.
+     * Declares the enrolment required action so Keycloak and the account console
+     * know how this credential is set up. It is never assigned automatically
+     * (see {@link #setRequiredActions}).
      */
-    @Override
-    public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-        // intentional no-op
-    }
-
     @Override
     public List<RequiredActionFactory> getRequiredActions(KeycloakSession session) {
         return Collections.singletonList((EmailAuthenticatorRequiredActionFactory) session.getKeycloakSessionFactory()
                 .getProviderFactory(RequiredActionProvider.class, EmailAuthenticatorRequiredAction.PROVIDER_ID));
-    }
-
-    @Override
-    public void close() {
-        // NOOP
-    }
-
-    private void sendEmailWithCode(AuthenticationFlowContext context, String code, int ttl) {
-        KeycloakSession session = context.getSession();
-        RealmModel realm = context.getRealm();
-        UserModel user = context.getUser();
-
-        if (user.getEmail() == null) {
-            logger.warnf("Could not send access code email due to missing email. realm=%s user=%s", realm.getId(),
-                    user.getUsername());
-            throw new AuthenticationFlowException(AuthenticationFlowError.INVALID_USER);
-        }
-
-        // Build email message with template data
-        Map<String, Object> templateData = new HashMap<>();
-        templateData.put("username", user.getUsername());
-        templateData.put("code", code);
-        templateData.put("ttl", ttl);
-
-        String realmName = realm.getDisplayName() != null ? realm.getDisplayName() : realm.getName();
-        String subject = realmName + " access code";
-
-        com.mesutpiskin.keycloak.auth.email.model.EmailMessage message = com.mesutpiskin.keycloak.auth.email.model.EmailMessage
-                .builder()
-                .to(user.getEmail())
-                .subject(subject)
-                .templateData(templateData)
-                .build();
-
-        // Determine email provider from config
-        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
-        Map<String, String> configMap = config != null && config.getConfig() != null
-                ? config.getConfig()
-                : Map.of();
-
-        String providerTypeStr = configMap.getOrDefault(
-                EmailConstants.EMAIL_PROVIDER_TYPE,
-                EmailConstants.DEFAULT_EMAIL_PROVIDER);
-        com.mesutpiskin.keycloak.auth.email.model.EmailProviderType providerType = com.mesutpiskin.keycloak.auth.email.model.EmailProviderType
-                .fromString(providerTypeStr);
-
-        try {
-            // Create email sender based on configuration
-            com.mesutpiskin.keycloak.auth.email.service.EmailSender emailSender = com.mesutpiskin.keycloak.auth.email.service.EmailSenderFactory
-                    .createEmailSender(
-                            providerType,
-                            configMap,
-                            session,
-                            realm,
-                            user);
-
-            // Send email
-            emailSender.sendEmail(message);
-            logger.infof("Email sent successfully via %s to %s",
-                    emailSender.getProviderName(), user.getEmail());
-
-        } catch (EmailException e) {
-            // Fallback to Keycloak SMTP if enabled
-            boolean fallbackEnabled = com.mesutpiskin.keycloak.auth.email.service.EmailSenderFactory
-                    .isFallbackEnabled(configMap);
-
-            if (fallbackEnabled
-                    && providerType != com.mesutpiskin.keycloak.auth.email.model.EmailProviderType.KEYCLOAK) {
-                logger.warnf(e, "Primary email provider (%s) failed, falling back to Keycloak SMTP",
-                        providerType.getDisplayName());
-                try {
-                    com.mesutpiskin.keycloak.auth.email.service.EmailSender fallbackSender = new com.mesutpiskin.keycloak.auth.email.service.impl.KeycloakEmailSender(
-                            session, realm, user);
-                    fallbackSender.sendEmail(message);
-                    logger.infof("Email sent successfully via fallback Keycloak SMTP to %s", user.getEmail());
-                } catch (EmailException fallbackEx) {
-                    logger.errorf(fallbackEx, "Fallback email provider also failed. realm=%s user=%s",
-                            realm.getId(), user.getUsername());
-                }
-            } else {
-                logger.errorf(e, "Failed to send access code email. realm=%s user=%s",
-                        realm.getId(), user.getUsername());
-            }
-        }
     }
 }
