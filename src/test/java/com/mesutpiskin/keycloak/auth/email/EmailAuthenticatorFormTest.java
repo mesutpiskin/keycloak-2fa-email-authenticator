@@ -10,18 +10,22 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowException;
 import org.keycloak.authentication.CredentialValidator;
+import org.keycloak.common.ClientConnection;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.http.HttpRequest;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.KeycloakUriInfo;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.UserModel;
+import org.keycloak.services.managers.BruteForceProtector;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -215,6 +219,9 @@ class EmailAuthenticatorFormTest {
         private RealmModel realm;
         private UserModel user;
         private LoginFormsProvider loginForm;
+        private BruteForceProtector protector;
+        private ClientConnection connection;
+        private KeycloakUriInfo uriInfo;
 
         @BeforeEach
         void setUp() {
@@ -228,6 +235,15 @@ class EmailAuthenticatorFormTest {
             when(context.getUser()).thenReturn(user);
             when(context.getAuthenticationSession()).thenReturn(session);
             when(context.getRealm()).thenReturn(realm);
+
+            protector = mock(BruteForceProtector.class);
+            connection = mock(ClientConnection.class);
+            uriInfo = mock(KeycloakUriInfo.class);
+            KeycloakSession keycloakSession = mock(KeycloakSession.class);
+            when(context.getSession()).thenReturn(keycloakSession);
+            when(keycloakSession.getProvider(BruteForceProtector.class)).thenReturn(protector);
+            when(context.getConnection()).thenReturn(connection);
+            when(context.getUriInfo()).thenReturn(uriInfo);
 
             HttpRequest httpRequest = mock(HttpRequest.class);
             MultivaluedHashMap<String, String> formData = new MultivaluedHashMap<>();
@@ -260,13 +276,45 @@ class EmailAuthenticatorFormTest {
         }
 
         @Test
-        @DisplayName("Keycloak BFP actif — le compteur de la lib ne doit pas être incrémenté")
-        void testKeycloakBfpActive_doesNotIncrementAttempts() {
+        @DisplayName("Realm brute force protection on: the attempt counter still runs and the failure is reported as otp")
+        void testKeycloakBfpActive_incrementsAttemptsAndReportsFailure() {
             when(realm.isBruteForceProtected()).thenReturn(true);
 
             form.action(context);
 
-            verify(session, never()).setAuthNote(eq("emailCodeAttempts"), anyString());
+            verify(session).setAuthNote("emailCodeAttempts", "1");
+            verify(protector).failedLogin(realm, user, connection, uriInfo, Set.of("otp"));
+            verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
+        }
+
+        @Test
+        @DisplayName("A correct code is accepted as an otp success, so Keycloak clears the secondary-factor counter the wrong codes fed")
+        void testCorrectCode_succeedsAsOtp() {
+            when(realm.isBruteForceProtected()).thenReturn(true);
+            MultivaluedHashMap<String, String> formData = new MultivaluedHashMap<>();
+            formData.putSingle(EmailConstants.CODE, "123456");
+            when(context.getHttpRequest().getDecodedFormParameters()).thenReturn(formData);
+
+            form.action(context);
+
+            verify(context).success("otp");
+            verify(context, never()).success();
+            verify(context, never()).failureChallenge(any(), any());
+            verifyNoInteractions(protector);
+        }
+
+        @Test
+        @DisplayName("Realm brute force protection on: at the limit the code is invalidated, and that attempt still counts towards the lockout")
+        void testKeycloakBfpActive_maxAttemptsReached_resetsCodeAndReportsFailure() {
+            when(realm.isBruteForceProtected()).thenReturn(true);
+            when(session.getAuthNote("emailCodeAttempts")).thenReturn("4"); // next = 5 = max
+
+            form.action(context);
+
+            verify(session).setAuthNote("emailCodeAttempts", "5");
+            verify(session).removeAuthNote(EmailConstants.CODE);
+            verify(loginForm).setAttribute("maxAttemptsReached", true);
+            verify(protector).failedLogin(realm, user, connection, uriInfo, Set.of("otp"));
             verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
         }
 
@@ -279,6 +327,7 @@ class EmailAuthenticatorFormTest {
 
             verify(session).setAuthNote("emailCodeAttempts", "1");
             verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
+            verifyNoInteractions(protector);
         }
 
         @Test
@@ -293,6 +342,7 @@ class EmailAuthenticatorFormTest {
             verify(session).removeAuthNote(EmailConstants.CODE);
             verify(loginForm).setAttribute("maxAttemptsReached", true);
             verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
+            verifyNoInteractions(protector);
         }
     }
 

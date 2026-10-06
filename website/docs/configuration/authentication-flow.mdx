@@ -207,6 +207,8 @@ Prevents users from spamming the "Resend code" button. The default of `30` secon
 #### Max code attempts
 After this many wrong attempts, the current code is invalidated and the user must request a new one. Lower values (e.g. `3`) make brute-forcing harder but may frustrate users who mistype frequently.
 
+This limit applies whether or not the realm has **Brute Force Detection** enabled. When it is enabled, each wrong code also counts towards the realm's lockout (reported to Keycloak as an `otp` failure), so the limit stops guessing against one code and the lockout stops an attacker who keeps requesting new ones. On Keycloak 26.5 and earlier a wrong code already counts towards the lockout; from 26.6 on Keycloak ignores failures outside its own categories, so this extension reports them explicitly. A correct code is accepted as an `otp` success, which also clears the realm's secondary-factor counter (**Max secondary auth failures**), so occasional typos do not add up to a permanent lockout.
+
 #### Show masked email on OTP form
 When enabled, the authenticator injects a server-generated `maskedEmail` attribute into the OTP form and displays it to the user, for example `u***e@example.com`. This improves UX by confirming where the code was sent without exposing the full address.
 

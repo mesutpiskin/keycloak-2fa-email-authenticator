@@ -207,7 +207,13 @@ public abstract class AbstractEmailAuthenticatorForm extends AbstractUsernameFor
 
         if (isValidCodeContext(context, userModel, formData)) {
             resetEmailCode(context);
-            context.success();
+            // Marked as an "otp" success, as Keycloak's own OTP form does. Wrong codes
+            // are reported under "otp" (see isValidCodeContext), and from 26.6 on that
+            // also feeds the realm's secondary-factor counter, which only a login that
+            // includes an otp credential clears. A plain success() would leave that
+            // counter growing with every typo until "Max secondary auth failures"
+            // locks the user permanently.
+            context.success(BruteForceFailureReporter.CATEGORY);
         }
     }
 
@@ -286,31 +292,44 @@ public abstract class AbstractEmailAuthenticatorForm extends AbstractUsernameFor
 
         context.getEvent().user(user).error(Errors.INVALID_USER_CREDENTIALS);
 
+        // The per-code attempt limit applies whether or not the realm has brute
+        // force protection enabled. It used to be skipped when protection was on,
+        // on the assumption that Keycloak would count the failure instead.
+        AuthenticationSessionModel session = context.getAuthenticationSession();
+        int attempts = incrementAttempts(session);
+
         if (context.getRealm().isBruteForceProtected()) {
-            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            // From Keycloak 26.6 on, the failureChallenge below is not counted: the
+            // brute force protector only accepts the password, otp and recovery-code
+            // categories and drops this authenticator's own reference category. The
+            // wrong code is therefore reported explicitly, under "otp", so the realm
+            // lockout applies.
+            //
+            // On 26.5 and earlier there is no category filter and the
+            // failureChallenge is already counted, so the reporter does nothing
+            // there; a second report would count each wrong code twice. The same
+            // holds if a future Keycloak starts counting our reference category:
+            // this call must then go.
+            BruteForceFailureReporter.report(context, user);
+        }
+
+        AuthenticatorConfigModel config = context.getAuthenticatorConfig();
+        Map<String, String> configValues = config != null && config.getConfig() != null
+                ? config.getConfig()
+                : Map.of();
+        int maxAttempts = resolvePositiveInt(configValues, EmailConstants.MAX_ATTEMPTS,
+                EmailConstants.DEFAULT_MAX_ATTEMPTS);
+
+        if (attempts >= maxAttempts) {
+            resetEmailCode(context);
+            LoginFormsProvider form = prepareForm(context, null);
+            form.setAttribute("maxAttemptsReached", true);
+            applyFormMessage(form, "email-authenticator-too-many-attempts", EmailConstants.CODE);
+            Response challengeResponse = form.createForm("email-code-form.ftl");
             context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
         } else {
-            AuthenticationSessionModel session = context.getAuthenticationSession();
-            int attempts = incrementAttempts(session);
-
-            AuthenticatorConfigModel config = context.getAuthenticatorConfig();
-            Map<String, String> configValues = config != null && config.getConfig() != null
-                    ? config.getConfig()
-                    : Map.of();
-            int maxAttempts = resolvePositiveInt(configValues, EmailConstants.MAX_ATTEMPTS,
-                    EmailConstants.DEFAULT_MAX_ATTEMPTS);
-
-            if (attempts >= maxAttempts) {
-                resetEmailCode(context);
-                LoginFormsProvider form = prepareForm(context, null);
-                form.setAttribute("maxAttemptsReached", true);
-                applyFormMessage(form, "email-authenticator-too-many-attempts", EmailConstants.CODE);
-                Response challengeResponse = form.createForm("email-code-form.ftl");
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            } else {
-                Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
-                context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
-            }
+            Response challengeResponse = challenge(context, Messages.INVALID_ACCESS_CODE, EmailConstants.CODE);
+            context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS, challengeResponse);
         }
         return false;
     }
