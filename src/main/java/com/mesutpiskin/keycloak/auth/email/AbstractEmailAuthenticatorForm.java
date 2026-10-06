@@ -207,7 +207,13 @@ public abstract class AbstractEmailAuthenticatorForm extends AbstractUsernameFor
 
         if (isValidCodeContext(context, userModel, formData)) {
             resetEmailCode(context);
-            context.success();
+            // Marked as an "otp" success, as Keycloak's own OTP form does. Wrong codes
+            // are reported under "otp" (see isValidCodeContext), and from 26.6 on that
+            // also feeds the realm's secondary-factor counter, which only a login that
+            // includes an otp credential clears. A plain success() would leave that
+            // counter growing with every typo until "Max secondary auth failures"
+            // locks the user permanently.
+            context.success(BruteForceFailureReporter.CATEGORY);
         }
     }
 
@@ -293,15 +299,17 @@ public abstract class AbstractEmailAuthenticatorForm extends AbstractUsernameFor
         int attempts = incrementAttempts(session);
 
         if (context.getRealm().isBruteForceProtected()) {
-            // Keycloak does not count the failureChallenge below: its brute force
-            // protector only accepts the password, otp and recovery-code categories
-            // and drops this authenticator's own reference category. The wrong code
-            // is therefore reported explicitly, under "otp", so the realm lockout
-            // applies.
+            // From Keycloak 26.6 on, the failureChallenge below is not counted: the
+            // brute force protector only accepts the password, otp and recovery-code
+            // categories and drops this authenticator's own reference category. The
+            // wrong code is therefore reported explicitly, under "otp", so the realm
+            // lockout applies.
             //
-            // This is the ONLY count for a wrong code as long as Keycloak keeps
-            // ignoring our reference category. If a future Keycloak starts counting
-            // it, each wrong code would be counted twice and this call must go.
+            // On 26.5 and earlier there is no category filter and the
+            // failureChallenge is already counted, so the reporter does nothing
+            // there; a second report would count each wrong code twice. The same
+            // holds if a future Keycloak starts counting our reference category:
+            // this call must then go.
             BruteForceFailureReporter.report(context, user);
         }
 

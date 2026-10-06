@@ -16,8 +16,8 @@ import java.util.Set;
 /**
  * Reports a wrong email code to Keycloak's brute force protector.
  * <p>
- * Keycloak only counts failures whose authentication category is
- * {@code password}, {@code otp} or {@code recovery-authn-codes}. The failure
+ * From 26.6 on, Keycloak only counts failures whose authentication category
+ * is {@code password}, {@code otp} or {@code recovery-authn-codes}. The failure
  * raised through {@code failureChallenge} carries this extension's own
  * reference category, so Keycloak drops it and the realm lockout never applies
  * to a wrong email code. The email code is a one-time password, so the failure
@@ -36,10 +36,21 @@ import java.util.Set;
  * <p>
  * A direct call links against one of them only and fails with
  * {@code NoSuchMethodError} on the others, which would turn every wrong code
- * into a server error. The method is therefore resolved once, reflectively.
- * When neither category-aware signature exists the call is skipped: the
- * per-code attempt limit still applies, and the login is never failed because
- * of this report.
+ * into a server error. The method is therefore resolved once, reflectively,
+ * when this class is first used.
+ * </p>
+ * <p>
+ * When neither category-aware signature exists (26.5 and earlier) the call is
+ * skipped on purpose. Those versions have no category filter, so the failure
+ * raised through {@code failureChallenge} already counts towards the lockout;
+ * reporting it again here would count every wrong code twice. The login is
+ * never failed because of this report.
+ * </p>
+ * <p>
+ * Under {@code otp}, Keycloak also counts the failure towards the realm's
+ * secondary-factor limit ({@code maxSecondaryAuthFailures}), which is cleared
+ * only by a login that includes an {@code otp} credential. The form therefore
+ * accepts a correct code with {@code context.success(CATEGORY)}.
  * </p>
  */
 final class BruteForceFailureReporter {
@@ -103,9 +114,9 @@ final class BruteForceFailureReporter {
             return (protector, realm, user, connection, uriInfo) -> withString.invoke(protector, realm, user,
                     connection, uriInfo, CATEGORY);
         }
-        logger.warnf("This Keycloak version has no BruteForceProtector.failedLogin that accepts an authentication "
-                + "category. Wrong email codes are still limited by 'Max code attempts', but they do not count "
-                + "towards the realm's brute force lockout.");
+        logger.debugf("This Keycloak version has no BruteForceProtector.failedLogin that accepts an authentication "
+                + "category, so it does not filter failures by category: wrong email codes already count towards "
+                + "the realm's brute force lockout and are not reported a second time.");
         return null;
     }
 

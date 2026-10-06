@@ -288,6 +288,22 @@ class EmailAuthenticatorFormTest {
         }
 
         @Test
+        @DisplayName("A correct code is accepted as an otp success, so Keycloak clears the secondary-factor counter the wrong codes fed")
+        void testCorrectCode_succeedsAsOtp() {
+            when(realm.isBruteForceProtected()).thenReturn(true);
+            MultivaluedHashMap<String, String> formData = new MultivaluedHashMap<>();
+            formData.putSingle(EmailConstants.CODE, "123456");
+            when(context.getHttpRequest().getDecodedFormParameters()).thenReturn(formData);
+
+            form.action(context);
+
+            verify(context).success("otp");
+            verify(context, never()).success();
+            verify(context, never()).failureChallenge(any(), any());
+            verifyNoInteractions(protector);
+        }
+
+        @Test
         @DisplayName("Realm brute force protection on: at the limit the code is invalidated, and that attempt still counts towards the lockout")
         void testKeycloakBfpActive_maxAttemptsReached_resetsCodeAndReportsFailure() {
             when(realm.isBruteForceProtected()).thenReturn(true);
