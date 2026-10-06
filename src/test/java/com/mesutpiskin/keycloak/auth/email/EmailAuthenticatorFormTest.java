@@ -23,7 +23,9 @@ import org.keycloak.models.SubjectCredentialManager;
 import org.keycloak.models.UserModel;
 import org.keycloak.services.managers.BruteForceProtector;
 import org.keycloak.sessions.AuthenticationSessionModel;
+import org.mockito.invocation.Invocation;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -275,6 +277,26 @@ class EmailAuthenticatorFormTest {
             when(config.getConfig()).thenReturn(Map.of(EmailConstants.MAX_ATTEMPTS, "5"));
         }
 
+        /**
+         * {@code failedLogin} takes the category as a {@code String} on Keycloak 26.6
+         * and as a {@code Set<String>} from 26.7, so a direct {@code verify} only
+         * compiles against one of them. Checking the recorded call works on both.
+         */
+        private void verifyFailureReportedAsOtp() {
+            List<Invocation> calls = mockingDetails(protector).getInvocations().stream()
+                    .filter(invocation -> invocation.getMethod().getName().equals("failedLogin"))
+                    .toList();
+            assertEquals(1, calls.size(), "failedLogin calls");
+
+            Object[] args = calls.get(0).getArguments();
+            assertSame(realm, args[0]);
+            assertSame(user, args[1]);
+            assertSame(connection, args[2]);
+            assertSame(uriInfo, args[3]);
+            assertTrue("otp".equals(args[4]) || Set.of("otp").equals(args[4]),
+                    "reported under " + args[4]);
+        }
+
         @Test
         @DisplayName("Realm brute force protection on: the attempt counter still runs and the failure is reported as otp")
         void testKeycloakBfpActive_incrementsAttemptsAndReportsFailure() {
@@ -283,7 +305,7 @@ class EmailAuthenticatorFormTest {
             form.action(context);
 
             verify(session).setAuthNote("emailCodeAttempts", "1");
-            verify(protector).failedLogin(realm, user, connection, uriInfo, Set.of("otp"));
+            verifyFailureReportedAsOtp();
             verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
         }
 
@@ -314,7 +336,7 @@ class EmailAuthenticatorFormTest {
             verify(session).setAuthNote("emailCodeAttempts", "5");
             verify(session).removeAuthNote(EmailConstants.CODE);
             verify(loginForm).setAttribute("maxAttemptsReached", true);
-            verify(protector).failedLogin(realm, user, connection, uriInfo, Set.of("otp"));
+            verifyFailureReportedAsOtp();
             verify(context).failureChallenge(eq(AuthenticationFlowError.INVALID_CREDENTIALS), any());
         }
 
