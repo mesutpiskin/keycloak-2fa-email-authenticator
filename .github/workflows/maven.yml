@@ -24,3 +24,33 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn -B package --file pom.xml
+
+  # The publish workflow builds and tests a jar for each of the last 10 Keycloak
+  # releases, not only the pom's default version. Building against the oldest of
+  # them here catches code or tests that only compile against newer Keycloak
+  # APIs before a release, instead of in the publish run.
+  build-oldest-keycloak:
+    name: Build against oldest published Keycloak
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Find the oldest Keycloak version the release publishes for
+      id: keycloak
+      env:
+        GH_TOKEN: ${{ github.token }}
+      # Same selection as the kc-version-matrix job in release.yml.
+      run: |
+        VERSION=$(gh api repos/keycloak/keycloak/releases \
+          --jq '[.[] | select(.prerelease == false and .draft == false)] | sort_by(.name)[-10:][0].name')
+        echo "Building against Keycloak $VERSION"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+    - uses: actions/checkout@v3
+    - name: Set up JDK 21
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+    - name: Build with Maven
+      run: mvn -B package --file pom.xml -Dkeycloak.version="${{ steps.keycloak.outputs.version }}"
