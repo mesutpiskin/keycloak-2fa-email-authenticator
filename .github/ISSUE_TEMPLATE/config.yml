@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://mesutpiskin.github.io/keycloak-2fa-email-authenticator/
+    about: Installation, authentication flow setup, email providers, and troubleshooting guides.
+  - name: Report a security vulnerability
+    url: https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/security/advisories/new
+    about: Please report security issues privately, not as a public issue.

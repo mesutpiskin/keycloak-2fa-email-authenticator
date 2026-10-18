@@ -8,13 +8,26 @@ description: How to contribute — translations, bug reports, features, and pull
 
 Contributions are welcome. Here are the ways you can help.
 
+:::info Project guidelines
+
+Before contributing, please read the guidelines in the repository:
+
+- [Contributing guide](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/CONTRIBUTING.md) — development setup, workflow, commit conventions, and pull request checklist
+- [Code of Conduct](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/CODE_OF_CONDUCT.md)
+- [Security policy](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/SECURITY.md) — report vulnerabilities privately, never as a public issue
+- [Accessibility](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/ACCESSIBILITY.md) — goals, known limitations, and how to report a barrier
+- [Keycloak compatibility](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/COMPATIBILITY.md) — which Keycloak versions each release supports
+
+:::
+
 ## Ways to Contribute
 
 | Type                 | Description                           |
 | -------------------- | ------------------------------------- |
 | **Translations**     | Add a new language — see guide below  |
-| **Bug Reports**      | Open an issue with reproduction steps |
-| **Feature Requests** | Share ideas via GitHub Issues         |
+| **Bug Reports**      | Use the Bug Report issue template     |
+| **Feature Requests** | Use the Feature Request issue template |
+| **Accessibility**    | Use the Accessibility Issue template  |
 | **Pull Requests**    | Fix bugs or implement new features    |
 
 ## Contribution Guidelines
@@ -23,14 +36,17 @@ Contributions are welcome. Here are the ways you can help.
 # 1. Fork and clone
 git clone https://github.com/<your-fork>/keycloak-2fa-email-authenticator.git
 
-# 2. Create a feature branch
-git checkout -b feature/my-improvement
+# 2. Create a branch
+git checkout -b feat/my-improvement
 
-# 3. Commit
-git commit -m 'Add my improvement'
+# 3. Build and test
+mvn -B package
 
-# 4. Push and open a PR
-git push origin feature/my-improvement
+# 4. Commit using Conventional Commits
+git commit -m 'feat: add my improvement'
+
+# 5. Push and open a PR
+git push origin feat/my-improvement
 ```
 
 **Code standards:**
@@ -73,7 +89,7 @@ import TabItem from "@theme/TabItem";
 
    Deploy to Keycloak, switch browser language, confirm all messages display correctly.
 
-4. Create a PR with branch name `add-<lang>-translation`.
+4. Create a PR with branch name `i18n/<lang>-messages`.
 
   </TabItem>
   <TabItem value="keys" label="Translation Keys">

@@ -1,0 +1,28 @@
+name: Question
+description: Ask a question about installing, configuring, or using the plugin
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [documentation](https://mesutpiskin.github.io/keycloak-2fa-email-authenticator/) and the [existing issues](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/issues) first, your question may already be answered there.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know? Include what you have already tried.
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: 26.7.2-KC26.7.3
+
+  - type: input
+    id: keycloak-version
+    attributes:
+      label: Keycloak version
+      placeholder: "26.7.3"
