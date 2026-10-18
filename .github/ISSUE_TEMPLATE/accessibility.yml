@@ -1,0 +1,64 @@
+name: Accessibility Issue
+description: Report something that makes the login pages, code emails, or documentation hard or impossible to use
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for telling us about a barrier. Fill in what you can, every field except the first two is optional. You do not need to tell us about any disability.
+
+        If you cannot sign in to an application right now, please also contact that application's support team, they can change the Keycloak settings for you. See [ACCESSIBILITY.md](https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/ACCESSIBILITY.md) for more information.
+
+  - type: textarea
+    id: task
+    attributes:
+      label: What were you trying to do?
+      placeholder: For example, enter the code at login, set up the email authenticator, or read the documentation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What happened?
+      description: Describe what stopped you or made the task difficult, and what you expected instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where did it happen?
+      options:
+        - Login code page
+        - Email authenticator setup page
+        - Setup verification page
+        - Code email
+        - Documentation website
+        - Other
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, email app, and operating system
+      placeholder: For example, Safari on iOS 18 with Apple Mail, Firefox 130 on Windows 11 with Outlook
+
+  - type: input
+    id: assistive-technology
+    attributes:
+      label: Assistive technology
+      description: Any screen reader, magnifier, voice control, switch device, or other tool you use.
+      placeholder: For example, NVDA 2024.3, VoiceOver, keyboard only
+
+  - type: input
+    id: versions
+    attributes:
+      label: Plugin and Keycloak versions
+      description: If you know them.
+      placeholder: 26.7.2-KC26.7.3 on Keycloak 26.7.3
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots or recordings are welcome but not required. Please remove codes, email addresses, and other personal data.

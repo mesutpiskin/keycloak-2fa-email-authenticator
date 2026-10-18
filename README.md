@@ -47,6 +47,12 @@ implementation 'io.github.mesutpiskin:keycloak-2fa-email-authenticator:26.3.0-KC
 
 Contributions are welcome — bug reports, feature requests, translations, and pull requests. Please open an issue first for significant changes.
 
+- [Contributing guide](CONTRIBUTING.md) — development setup, workflow, and pull request checklist
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md) — report vulnerabilities privately, not as a public issue
+- [Accessibility](ACCESSIBILITY.md) — goals, known limitations, and how to report a barrier
+- [Keycloak compatibility](COMPATIBILITY.md) — which Keycloak versions each release supports
+
 ## Sponsor
 
 This project is developed and maintained voluntarily.

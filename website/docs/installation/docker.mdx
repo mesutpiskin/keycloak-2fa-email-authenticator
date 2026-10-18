@@ -13,7 +13,9 @@ This project includes a **multi-stage Dockerfile** for containerized deployment.
 | Stage       | Base Image                         | Purpose                                       |
 | ----------- | ---------------------------------- | --------------------------------------------- |
 | **Builder** | `maven:3.9-eclipse-temurin-21`     | Compiles source and produces the provider JAR |
-| **Runtime** | `quay.io/keycloak/keycloak:26.5.3` | Copies the JAR and runs `kc.sh build`         |
+| **Runtime** | `quay.io/keycloak/keycloak:26.7.3` | Copies the JAR and runs `kc.sh build`         |
+
+Both stages use the `KEYCLOAK_VERSION` build argument (default `26.7.3`). To try another Keycloak version, pass it at build time, for example `docker build --build-arg KEYCLOAK_VERSION=26.6.2 -t keycloak-2fa-email:latest .`
 
 ## Build the Image
 

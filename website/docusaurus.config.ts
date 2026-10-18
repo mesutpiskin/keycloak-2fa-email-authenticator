@@ -112,6 +112,22 @@ const config: Config = {
               label: "Discussions",
               href: "https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/discussions",
             },
+            {
+              label: "Contributing Guide",
+              href: "https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/CONTRIBUTING.md",
+            },
+            {
+              label: "Code of Conduct",
+              href: "https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/CODE_OF_CONDUCT.md",
+            },
+            {
+              label: "Security Policy",
+              href: "https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/SECURITY.md",
+            },
+            {
+              label: "Accessibility",
+              href: "https://github.com/mesutpiskin/keycloak-2fa-email-authenticator/blob/main/ACCESSIBILITY.md",
+            },
           ],
         },
         {
