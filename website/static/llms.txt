@@ -42,7 +42,7 @@
 
 - src/main/java/                                        — authenticator SPI implementation
 - src/main/resources/theme-resources/templates/html/   — FreeMarker email template (variables: ${code}, ${ttl})
-- src/main/resources/theme-resources/messages/         — i18n properties (en, tr, fr, de, es, it, da, ru, az, ar, zh_TW)
+- src/main/resources/theme-resources/messages/         — i18n properties (en, tr, fr, de, es, it, da, ru, az, ar, zh_TW, pt, ro)
 
 ## Docs
 

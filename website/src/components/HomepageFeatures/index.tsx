@@ -38,7 +38,7 @@ const features: FeatureItem[] = [
     description: (
       <>
         Fully customize the OTP email&apos;s HTML layout, subject line, and body
-        text. Ships with translations for <strong>11 languages</strong>{" "}
+        text. Ships with translations for <strong>13 languages</strong>{" "}
         including Arabic, Chinese, and Russian.
       </>
     ),
