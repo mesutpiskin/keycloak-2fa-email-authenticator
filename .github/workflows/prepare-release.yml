@@ -1,0 +1,118 @@
+# Step 1 of a release. Run it manually with the version to release: it bumps
+# pom.xml on a release/v<version> branch and opens a "Release <version>" PR to
+# main. Nothing is tagged or published yet.
+#
+# Merging that PR runs release.yml (tag + GitHub Release), which then runs
+# publish.yml (build + publish the jars).
+#
+# Optional secret: RELEASE_TOKEN (PAT with contents + pull-requests write). PRs
+#                  opened with the default GITHUB_TOKEN do not trigger other
+#                  workflows, so "Java CI with Maven" would not run on the
+#                  release PR; matters only if main requires status checks.
+
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 26.5.1 (a leading "v" is stripped)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    name: Prepare release PR
+    runs-on: ubuntu-latest
+
+    # Two dispatches at once would race for the same branch and version.
+    concurrency:
+      group: ${{ github.workflow }}-prepare
+      cancel-in-progress: false
+
+    steps:
+      # Always main, regardless of the branch selected in the dispatch UI, so a
+      # release PR never carries unrelated commits.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Validate version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${INPUT_VERSION#v}"
+
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$INPUT_VERSION' is not a valid version (expected e.g. 26.5.1)."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists — pick a new version."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --heads origin "refs/heads/release/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Branch release/v$VERSION already exists — a release for this version is already in flight."
+            exit 1
+          fi
+
+          CURRENT=$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)
+          if [ "$VERSION" = "$CURRENT" ]; then
+            echo "::error::The pom is already at $VERSION — nothing to bump."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "branch=release/v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Main's pom carries the base version only (no -KC suffix): publish.yml
+      # sets -KC<keycloak-version> for each jar at deploy time.
+      - name: Set pom version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: mvn -B -q versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+
+      - name: Open release pull request
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git switch -c "$BRANCH"
+          git add pom.xml
+          git commit -m "chore(release): bump version to $VERSION"
+          git push origin "$BRANCH"
+
+          URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Release $VERSION" \
+            --body "Merging this PR tags \`v$VERSION\`, publishes a GitHub Release with auto-generated notes, and builds+publishes the jars for the last 10 Keycloak releases to Maven Central and GitHub Packages.")
+
+          {
+            echo "### Release $VERSION prepared"
+            echo
+            echo "Review and merge $URL to tag and publish."
+          } >> "$GITHUB_STEP_SUMMARY"

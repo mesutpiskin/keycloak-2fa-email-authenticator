@@ -35,17 +35,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: actions/checkout@v3
+    # Same list publish.yml builds for.
     - name: Find the oldest Keycloak version the release publishes for
       id: keycloak
-      env:
-        GH_TOKEN: ${{ github.token }}
-      # Same selection as the kc-version-matrix job in release.yml.
-      run: |
-        VERSION=$(gh api repos/keycloak/keycloak/releases \
-          --jq '[.[] | select(.prerelease == false and .draft == false)] | sort_by(.name)[-10:][0].name')
-        echo "Building against Keycloak $VERSION"
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-    - uses: actions/checkout@v3
+      uses: ./.github/actions/keycloak-versions
     - name: Set up JDK 21
       uses: actions/setup-java@v3
       with:
@@ -53,4 +47,4 @@ jobs:
         distribution: 'temurin'
         cache: maven
     - name: Build with Maven
-      run: mvn -B package --file pom.xml -Dkeycloak.version="${{ steps.keycloak.outputs.version }}"
+      run: mvn -B package --file pom.xml -Dkeycloak.version="${{ steps.keycloak.outputs.oldest }}"
