@@ -1,0 +1,55 @@
+name: Last Keycloak releases
+description: >-
+  Lists the last N stable Keycloak releases, oldest first. The one place that
+  decides which Keycloak versions get built and published.
+
+inputs:
+  count:
+    description: How many releases to list
+    required: false
+    default: '10'
+  released-after:
+    description: >-
+      Optional ISO 8601 UTC timestamp, e.g. 2026-10-07T10:36:55Z. Keeps only the
+      releases (of the last N) that Keycloak published after it.
+    required: false
+    default: ''
+
+outputs:
+  versions:
+    description: JSON array of versions, oldest first, e.g. ["26.7.5","26.8.0"]
+    value: ${{ steps.list.outputs.versions }}
+  oldest:
+    description: The oldest version in the list (empty if the list is empty)
+    value: ${{ steps.list.outputs.oldest }}
+
+runs:
+  using: composite
+  steps:
+    - id: list
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        COUNT: ${{ inputs.count }}
+        RELEASED_AFTER: ${{ inputs.released-after }}
+      run: |
+        set -euo pipefail
+
+        # Sorted numerically, so 26.10.0 comes after 26.9.0.
+        RELEASES=$(gh api 'repos/keycloak/keycloak/releases?per_page=100' \
+          | jq -c --argjson n "$COUNT" \
+              '[.[] | select(.prerelease == false and .draft == false)
+                    | select(.name | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))]
+               | sort_by(.name | split(".") | map(tonumber)) | .[-$n:]')
+
+        if [ "$RELEASES" = "[]" ]; then
+          echo "::error::Found no Keycloak releases."
+          exit 1
+        fi
+
+        # Timestamps share one format (UTC, "Z"), so string comparison works.
+        VERSIONS=$(jq -c --arg after "$RELEASED_AFTER" \
+          'map(select($after == "" or .published_at > $after) | .name)' <<< "$RELEASES")
+
+        echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
+        echo "oldest=$(jq -r '.[0] // ""' <<< "$VERSIONS")" >> "$GITHUB_OUTPUT"

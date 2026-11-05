@@ -1,0 +1,105 @@
+# Weekly: publishes the latest release for Keycloak versions that came out
+# after it, so a new Keycloak release does not need a new release of this
+# project. "After" is by date, so a patch on an older Keycloak line (e.g. a
+# 26.7.x backport after 26.8.0) is picked up too. Keycloak versions that
+# already existed when the release was made are left alone: if one is missing,
+# its build failed at release time and needs a maintainer, who can publish it
+# by hand with publish.yml.
+#
+# If the latest code does not build or pass tests against a new Keycloak
+# version, that publish job fails and nothing is published for it. It is then
+# retried every week until a release fixes it.
+#
+# GitHub disables scheduled workflows after 60 days without repository
+# activity; re-enable it from the Actions tab if that happens.
+
+name: Check for new Keycloak releases
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+# A manual run during the scheduled one would publish the same versions twice.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  find-new:
+    name: Find Keycloak versions released after the latest release
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.latest.outputs.tag }}
+      keycloak_versions: ${{ steps.list.outputs.keycloak_versions }}
+
+    steps:
+      - name: Latest release
+        id: latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          TAG=$(gh release view --json tagName -q .tagName)
+          RELEASE=$(gh release view "$TAG" --json publishedAt,assets)
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "published_at=$(jq -r .publishedAt <<< "$RELEASE")" >> "$GITHUB_OUTPUT"
+
+          # No jars at all means the release's own publish run is still going
+          # or failed. Re-running that is a decision for a maintainer, not
+          # something to retry for all 10 Keycloak versions every week.
+          if jq -e '[.assets[].name | select(endswith(".jar"))] | length > 0' <<< "$RELEASE" >/dev/null; then
+            echo "has_jars=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$TAG has no jars attached yet — check its Release run, or publish it by hand with Publish packages."
+            echo "$TAG has no jars attached yet — nothing published." >> "$GITHUB_STEP_SUMMARY"
+            echo "has_jars=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.latest.outputs.has_jars == 'true'
+        with:
+          sparse-checkout: .github
+
+      - name: Keycloak releases after the latest release
+        id: after
+        if: steps.latest.outputs.has_jars == 'true'
+        uses: ./.github/actions/keycloak-versions
+        with:
+          released-after: ${{ steps.latest.outputs.published_at }}
+
+      # Versions already attached are dropped by publish.yml itself.
+      - name: List
+        id: list
+        if: steps.latest.outputs.has_jars == 'true'
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+          VERSIONS: ${{ steps.after.outputs.versions }}
+        run: |
+          set -euo pipefail
+          CSV=$(jq -r 'join(",")' <<< "$VERSIONS")
+          echo "keycloak_versions=$CSV" >> "$GITHUB_OUTPUT"
+          if [ -n "$CSV" ]; then
+            echo "Keycloak released after $TAG: $CSV" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Keycloak release since $TAG." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  publish:
+    name: Publish
+    needs: find-new
+    if: needs.find-new.outputs.keycloak_versions != ''
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.find-new.outputs.tag }}
+      keycloak_versions: ${{ needs.find-new.outputs.keycloak_versions }}
+    secrets: inherit

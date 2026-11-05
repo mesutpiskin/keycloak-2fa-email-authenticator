@@ -1,0 +1,280 @@
+# Builds an existing release tag against one or more Keycloak versions and
+# publishes each jar as <version>-KC<keycloak-version> to Maven Central and
+# GitHub Packages, attaching it to that tag's GitHub Release.
+#
+# Runs in three ways:
+# - from release.yml, right after a new release is tagged;
+# - from check-keycloak-releases.yml, weekly, for new Keycloak versions;
+# - by hand, to publish an existing release for a new Keycloak version without
+#   cutting a new release (no source change needed: the -KC suffix makes it a
+#   new Maven version).
+#
+# Published jars are never rebuilt or replaced:
+# - a Keycloak version whose jar is already attached to the release is skipped;
+# - a version already on Maven Central is not rebuilt: Central's own signed
+#   files are attached to the release and sent to GitHub Packages.
+#
+# Requires secrets: CENTRAL_TOKEN_USERNAME, CENTRAL_TOKEN_PASSWORD,
+#                   GPG_SIGNING_KEY, GPG_SIGNING_KEY_PASSWORD
+
+name: Publish packages
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Existing release tag, e.g. v26.7.2'
+        required: true
+        type: string
+      keycloak_versions:
+        description: 'Comma-separated Keycloak versions; empty = last 10 Keycloak releases'
+        required: false
+        type: string
+        default: ''
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, e.g. v26.7.2 (empty = latest release)'
+        required: false
+        type: string
+      keycloak_versions:
+        description: 'Comma-separated Keycloak versions, e.g. 26.8.1,26.8.2 (empty = last 10 Keycloak releases)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  ARTIFACT_ID: keycloak-2fa-email-authenticator
+  CENTRAL_DIR: https://repo1.maven.org/maven2/io/github/mesutpiskin/keycloak-2fa-email-authenticator
+
+jobs:
+  resolve:
+    name: Resolve tag and Keycloak versions
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      keycloak_versions: ${{ steps.resolve.outputs.keycloak_versions }}
+
+    steps:
+      # Only for the shared keycloak-versions action; the build checks out the
+      # tag. When called from release.yml (a merged PR), use the merge commit:
+      # the default PR merge ref may be stale or gone by then.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || '' }}
+          sparse-checkout: .github
+
+      - name: Last Keycloak releases
+        id: last
+        uses: ./.github/actions/keycloak-versions
+
+      - name: Resolve
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_KC: ${{ inputs.keycloak_versions }}
+          DEFAULT_KC: ${{ steps.last.outputs.versions }}
+        run: |
+          set -euo pipefail
+
+          TAG="${INPUT_TAG:-}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh release view --json tagName -q .tagName)
+          fi
+          TAG="v${TAG#v}"
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::No GitHub Release for tag $TAG — publish only works for an existing release."
+            exit 1
+          fi
+
+          # Requested versions, one per line. Input with only commas or spaces
+          # counts as empty and falls back to the last 10 Keycloak releases.
+          REQUESTED=$(printf '%s' "${INPUT_KC:-}" | tr ',' '\n' | tr -d ' ' | sed '/^$/d' | sort -uV)
+          if [ -z "$REQUESTED" ]; then
+            REQUESTED=$(jq -r '.[]' <<< "$DEFAULT_KC")
+          fi
+
+          ASSETS=$(gh release view "$TAG" --json assets -q '.assets[].name')
+
+          TODO=""
+          SKIPPED=""
+          while read -r kc; do
+            if ! printf '%s' "$kc" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::'$kc' is not a valid Keycloak version (expected e.g. 26.8.1)."
+              exit 1
+            fi
+            if grep -qxF "${ARTIFACT_ID}-${TAG}-KC${kc}.jar" <<< "$ASSETS"; then
+              SKIPPED="${SKIPPED:+$SKIPPED, }$kc"
+            else
+              TODO="${TODO}${kc}"$'\n'
+            fi
+          done <<< "$REQUESTED"
+
+          VERSIONS_JSON=$(printf '%s' "$TODO" | sed '/^$/d' | jq -R . | jq -sc .)
+
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+            echo "keycloak_versions=$VERSIONS_JSON"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "Release: $TAG"
+            echo
+            if [ "$VERSIONS_JSON" = "[]" ]; then
+              echo "Nothing to publish: every requested Keycloak version is already attached to the release."
+            else
+              echo "Publishing for Keycloak: $(jq -r 'join(", ")' <<< "$VERSIONS_JSON")"
+            fi
+            if [ -n "$SKIPPED" ]; then
+              echo
+              echo "Already attached to the release, skipped: $SKIPPED"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Publish ${{ needs.resolve.outputs.tag }} for Keycloak ${{ matrix.keycloak }}
+    needs: resolve
+    if: needs.resolve.outputs.keycloak_versions != '[]'
+    runs-on: ubuntu-latest
+    # Runs for the same jar wait for each other; the check below then stops the
+    # later one from publishing it again.
+    concurrency:
+      group: publish-${{ needs.resolve.outputs.tag }}-KC${{ matrix.keycloak }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        keycloak: ${{ fromJson(needs.resolve.outputs.keycloak_versions) }}
+    env:
+      TAG: ${{ needs.resolve.outputs.tag }}
+      MAVEN_VERSION: ${{ needs.resolve.outputs.version }}-KC${{ matrix.keycloak }}
+      KC_VERSION: ${{ matrix.keycloak }}
+
+    steps:
+      # Re-checked here, not only in resolve: another run for the same jar may
+      # have finished while this job waited for the concurrency group.
+      - name: Check what is already published
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" --json assets -q '.assets[].name' \
+              | grep -qxF "${ARTIFACT_ID}-${TAG}-KC${KC_VERSION}.jar"; then
+            echo "Already attached to $TAG — nothing to do."
+            echo "attached=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "attached=false" >> "$GITHUB_OUTPUT"
+
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+            "${CENTRAL_DIR}/${MAVEN_VERSION}/${ARTIFACT_ID}-${MAVEN_VERSION}.pom")
+          if [ "$CODE" = "200" ]; then
+            echo "$MAVEN_VERSION is already on Maven Central — attaching Central's files instead of rebuilding."
+            echo "on_central=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on_central=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.state.outputs.attached == 'false'
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - name: Set up Maven Central Repository
+        if: steps.state.outputs.attached == 'false'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Add GitHub Packages server to Maven settings
+        if: steps.state.outputs.attached == 'false'
+        run: |
+          sed -i 's|</servers>|<server><id>github</id><username>${env.GITHUB_ACTOR}</username><password>${env.GITHUB_TOKEN}</password></server></servers>|' ~/.m2/settings.xml
+
+      - name: Build and publish to Maven Central
+        if: steps.state.outputs.attached == 'false' && steps.state.outputs.on_central == 'false'
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mvn -B versions:set -DnewVersion="$MAVEN_VERSION" -DgenerateBackupPoms=false
+
+          set +e
+          mvn -B -Dkeycloak.version="$KC_VERSION" deploy -P release 2>&1 | tee mvn.log
+          mvn_exit=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$mvn_exit" -ne 0 ] && grep -q "already exists" mvn.log; then
+            echo "::error::Central reports $MAVEN_VERSION already exists, but it is not on repo1.maven.org yet (Central can take a while to sync). Re-run this job later: it will then attach Central's files."
+          fi
+          exit "$mvn_exit"
+
+      # The signed files, named as the release assets are (finalName has a "v").
+      - name: Collect the signed artifacts
+        if: steps.state.outputs.attached == 'false' && steps.state.outputs.on_central == 'false'
+        run: |
+          mkdir dist
+          cp "target/${ARTIFACT_ID}-v${MAVEN_VERSION}"* dist/
+
+      - name: Download the artifacts from Maven Central
+        if: steps.state.outputs.attached == 'false' && steps.state.outputs.on_central == 'true'
+        run: |
+          set -euo pipefail
+          mkdir dist
+          for suffix in .jar -sources.jar -javadoc.jar .pom; do
+            for ext in "" .asc; do
+              curl -fsSL -o "dist/${ARTIFACT_ID}-v${MAVEN_VERSION}${suffix}${ext}" \
+                "${CENTRAL_DIR}/${MAVEN_VERSION}/${ARTIFACT_ID}-${MAVEN_VERSION}${suffix}${ext}"
+            done
+          done
+
+      # Deploys the same files as Central and the release, instead of a rebuild.
+      - name: Publish to GitHub Packages
+        if: steps.state.outputs.attached == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          BASE="dist/${ARTIFACT_ID}-v${MAVEN_VERSION}"
+          mvn -B org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file \
+            -DrepositoryId=github \
+            -Durl="https://maven.pkg.github.com/${GITHUB_REPOSITORY}" \
+            -Dfile="${BASE}.jar" -DpomFile="${BASE}.pom" \
+            -Dsources="${BASE}-sources.jar" -Djavadoc="${BASE}-javadoc.jar" \
+            2>&1 | tee deploy.log
+          mvn_exit=${PIPESTATUS[0]}
+          set -e
+          if [ "$mvn_exit" -ne 0 ] && grep -qE "status code: 409|Conflict \(409\)" deploy.log; then
+            echo "Version already exists on GitHub Packages — skipping."
+            exit 0
+          fi
+          exit "$mvn_exit"
+
+      - name: Attach artifact to release
+        if: steps.state.outputs.attached == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
