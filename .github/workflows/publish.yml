@@ -270,11 +270,32 @@ jobs:
           fi
           exit "$mvn_exit"
 
+      # Upload only: the release already exists and is never edited, and
+      # attached files are never replaced. Files already attached by an earlier,
+      # partly failed run are skipped. The main jar goes last: the checks above
+      # treat it as "done", so it must only appear once the rest is attached.
       - name: Attach artifact to release
         if: steps.state.outputs.attached == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG }}
-          files: dist/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          MAIN="dist/${ARTIFACT_ID}-v${MAVEN_VERSION}.jar"
+          if [ ! -f "$MAIN" ]; then
+            echo "::error::$MAIN was not found in dist/."
+            exit 1
+          fi
+
+          ASSETS=$(gh release view "$TAG" --json assets -q '.assets[].name')
+          for f in dist/*; do
+            [ "$f" = "$MAIN" ] && continue
+            if grep -qxF "$(basename "$f")" <<< "$ASSETS"; then
+              echo "$(basename "$f") is already attached — skipping."
+            else
+              gh release upload "$TAG" "$f"
+            fi
+          done
+          gh release upload "$TAG" "$MAIN"
